@@ -1,0 +1,49 @@
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Virtual Environments
+.venv/
+venv/
+ENV/
+env/
+
+# Environment Variables
+.env
+.env.local
+*.env
+
+# IDE & Editor settings
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Large Model Checkpoints and Serialized Weights (>100MB)
+# Note: Keep lightweight configs and metadata tracked if needed
+models/*.bin
+models/*.pt
+models/*.pth
+models/*.onnx
+models/*.h5
+models/*.safetensors
+!models/.gitkeep
+
+# Data (Raw / Large Datasets)
+data/raw/
+data/processed/
+data/*.csv
+data/*.parquet
+data/*.jsonl
+data/*.zip
+data/*.tar.gz
+!data/.gitkeep
+
+# Logs and outputs
+logs/
+*.log
