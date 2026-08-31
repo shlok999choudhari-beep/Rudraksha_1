@@ -89,8 +89,8 @@ class SuryaOCREngine:
         try:
             import pytesseract
             engine_name = "Tesseract OCR Engine"
-            # Extract word data with bounding boxes
-            data = pytesseract.image_to_data(image, output_type=pytesseract.Output.DICT)
+            # Extract word data with bounding boxes (max 2s timeout)
+            data = pytesseract.image_to_data(image, output_type=pytesseract.Output.DICT, timeout=2)
             n_boxes = len(data.get('text', []))
             for i in range(n_boxes):
                 t = data['text'][i].strip()

@@ -188,13 +188,13 @@ def extract_and_parse_mrz_from_image(
             try:
                 import pytesseract
                 # Pass 1: MRZ Crop (fastest)
-                raw_txt = pytesseract.image_to_string(mrz_crop, config='--psm 6')
+                raw_txt = pytesseract.image_to_string(mrz_crop, config='--psm 6', timeout=2)
                 lines = clean_ocr_mrz_text(raw_txt)
 
                 # Pass 2: Lower 25% band if crop missed
                 if len(lines) < 2:
                     lower_band = image[int(h * 0.72):, :]
-                    raw_txt = pytesseract.image_to_string(lower_band, config='--psm 6')
+                    raw_txt = pytesseract.image_to_string(lower_band, config='--psm 6', timeout=2)
                     lines = clean_ocr_mrz_text(raw_txt)
             except Exception:
                 pass
