@@ -102,13 +102,51 @@ def check_image_quality(
     if is_blurry:
         warnings.append(f"Image appears blurry (sharpness score {blur_score:.1f} < threshold {blur_threshold:.1f}).")
 
-    # 2. Glare Detection (Saturated highlights)
-    glare_pixels = np.sum(gray >= 252)
-    total_pixels = gray.size
-    glare_ratio = float(glare_pixels / max(total_pixels, 1))
+    # 2. Specular Glare Detection (Morphological Blob & Text-Aware Analysis)
+    total_pixels = max(gray.size, 1)
+    if len(image.shape) == 3 and image.shape[2] == 3:
+        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        sat = hsv[:, :, 1]
+    else:
+        sat = np.zeros_like(gray)
+
+    # Candidate specular blown-out pixels (pure saturated white hotspot)
+    highlight_mask = (gray >= 253) & (sat <= 20)
+    highlight_u8 = highlight_mask.astype(np.uint8) * 255
+
+    # Morphological opening to filter isolated noise / anti-aliased character edges
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9))
+    cleaned_highlights = cv2.morphologyEx(highlight_u8, cv2.MORPH_OPEN, kernel)
+
+    # Analyze connected components
+    num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(cleaned_highlights)
+    true_glare_pixels = 0
+    min_glare_area = max(250, int(total_pixels * 0.002))
+
+    for i in range(1, num_labels):
+        area = stats[i, cv2.CC_STAT_AREA]
+        bx = stats[i, cv2.CC_STAT_LEFT]
+        by = stats[i, cv2.CC_STAT_TOP]
+        bw = stats[i, cv2.CC_STAT_WIDTH]
+        bh = stats[i, cv2.CC_STAT_HEIGHT]
+
+        if area < min_glare_area:
+            continue
+
+        # Check if this is the legitimate MRZ optical white band at bottom of document
+        is_bottom_band = (by > 0.50 * h) and (bw > 0.40 * w) and (bw / max(bh, 1) > 2.0)
+        if is_bottom_band:
+            patch_gray = gray[by:by+bh, bx:bx+bw]
+            lap_var = cv2.Laplacian(patch_gray, cv2.CV_64F).var()
+            if lap_var > 8.0:  # Contains printed text/edges
+                continue
+
+        true_glare_pixels += area
+
+    glare_ratio = float(true_glare_pixels / total_pixels)
     has_glare = glare_ratio > glare_threshold
     if has_glare:
-        warnings.append(f"Possible glare or reflection detected ({glare_ratio * 100:.1f}% overexposed pixels).")
+        warnings.append(f"Specular reflection/glare detected ({glare_ratio * 100:.1f}% hotspot coverage).")
 
     # 3. Brightness & Exposure
     mean_brightness = float(np.mean(gray))
