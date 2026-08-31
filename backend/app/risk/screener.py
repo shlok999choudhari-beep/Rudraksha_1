@@ -98,8 +98,19 @@ def screen_document_and_identity(
     # -------------------------------------------------------------------------
     # Stage 3: Surya OCR & Document Layout Recognition
     # -------------------------------------------------------------------------
-    ocr_res = surya_engine.detect_and_read_text(normalized_canvas)
-    mrz_parsed = ocr_res.mrz_parsed_result
+    try:
+        ocr_res = surya_engine.detect_and_read_text(normalized_canvas)
+        mrz_parsed = ocr_res.mrz_parsed_result
+    except Exception:
+        from backend.app.mrz.extractor import extract_and_parse_mrz_from_image
+        from backend.app.ocr.cross_validation import VIZDataPayload
+        mrz_parsed = extract_and_parse_mrz_from_image(normalized_canvas)
+        ocr_res = OCRDocumentLayoutResult(
+            raw_text="",
+            text_lines=[],
+            viz_data=VIZDataPayload(),
+            mrz_parsed_result=mrz_parsed
+        )
 
     # -------------------------------------------------------------------------
     # Stage 4: VIZ <-> MRZ Cross-Validation

@@ -109,6 +109,23 @@ app.mount("/static/synthetic", StaticFiles(directory="data/synthetic"), name="sy
 app.mount("/static/captures", StaticFiles(directory="data/captures"), name="captures_data")
 
 
+@app.on_event("startup")
+def startup_warmup():
+    """
+    Preheats EasyOCR and AI model caches in a background daemon thread
+    so the first real API screening call executes instantaneously without cold-start timeouts.
+    """
+    import threading
+    def _warmup():
+        try:
+            from backend.app.ocr.surya_engine import surya_engine
+            dummy = np.zeros((100, 100, 3), dtype=np.uint8)
+            surya_engine.detect_and_read_text(dummy)
+        except Exception:
+            pass
+    threading.Thread(target=_warmup, daemon=True).start()
+
+
 # Request/Response DTOs
 class MRZParseRequest(BaseModel):
     mrz_text: Optional[str] = None
