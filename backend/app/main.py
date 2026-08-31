@@ -139,39 +139,45 @@ def root():
     }
 
 
-@app.get("/api/test-screening")
-def test_screening_diagnostic():
-    """Runs pipeline on synthetic specimen and returns step-by-step diagnostic breakdown."""
+@app.get("/api/test-step/{step_id}")
+def test_step_diagnostic(step_id: int):
+    """Pinpoints the exact sub-module causing issues on Railway Linux."""
     import time, traceback
     t0 = time.time()
-    steps = {}
     try:
-        from backend.app.risk.screener import screen_document_and_identity
         doc_path = "data/synthetic/sample_tilted_passport.jpg"
         if not os.path.exists(doc_path):
             doc_path = generate_synthetic_passport(tilt_and_place=False)
         img = cv2.imread(doc_path)
-        steps["image_loaded"] = True
         
-        rep = screen_document_and_identity(img)
-        t1 = time.time()
-        return {
-            "success": True,
-            "duration_s": round(t1 - t0, 2),
-            "screening_id": rep.screening_id,
-            "ocr_lines_count": len(rep.ocr_layout_report.text_lines),
-            "mrz_valid": rep.mrz_parsed_result.is_valid if rep.mrz_parsed_result else False,
-            "risk_score": rep.risk_assessment.overall_trust_score,
-            "steps": steps
-        }
+        if step_id == 1:
+            from backend.app.preprocessing import preprocess_document
+            res = preprocess_document(img)
+            return {"step": 1, "name": "preprocessing", "success": res.success, "time": round(time.time() - t0, 3)}
+
+        elif step_id == 2:
+            from backend.app.geometry import evaluate_passport_geometry
+            res = evaluate_passport_geometry(img)
+            return {"step": 2, "name": "geometry", "valid": res.is_layout_valid, "time": round(time.time() - t0, 3)}
+
+        elif step_id == 3:
+            from backend.app.ocr.surya_engine import surya_engine
+            res = surya_engine.detect_and_read_text(img)
+            return {"step": 3, "name": "ocr_layout", "lines": len(res.text_lines), "time": round(time.time() - t0, 3)}
+
+        elif step_id == 4:
+            from backend.app.tampering import analyze_document_tampering
+            res = analyze_document_tampering(img)
+            return {"step": 4, "name": "tampering", "score": res.tamper_risk_score, "time": round(time.time() - t0, 3)}
+
+        elif step_id == 5:
+            from backend.app.face import verify_identity_and_liveness
+            res = verify_identity_and_liveness(img, img)
+            return {"step": 5, "name": "face_liveness", "verified": res.is_verified, "time": round(time.time() - t0, 3)}
+
+        return {"step": step_id, "error": "unknown step"}
     except Exception as e:
-        return {
-            "success": False,
-            "duration_s": round(time.time() - t0, 2),
-            "error": str(e),
-            "traceback": traceback.format_exc(),
-            "steps": steps
-        }
+        return {"step": step_id, "success": False, "error": str(e), "traceback": traceback.format_exc()}
 
 
 @app.get("/health")
