@@ -53,13 +53,34 @@ class PreprocessingResult:
         }
 
 
+def read_pdf_first_page(pdf_source: Union[str, bytes]) -> np.ndarray:
+    """Renders the first page of a PDF document at 300 DPI as a BGR image."""
+    import pypdfium2 as pdfium
+    try:
+        if isinstance(pdf_source, bytes):
+            pdf = pdfium.PdfDocument(pdf_source)
+        else:
+            pdf = pdfium.PdfDocument(pdf_source)
+
+        if len(pdf) == 0:
+            raise ValueError("PDF document has 0 pages.")
+
+        page = pdf[0]
+        # Render at 300 DPI (scale = 300 / 72 ~= 4.1667)
+        pil_img = page.render(scale=300.0 / 72.0).to_pil()
+        rgb_img = np.array(pil_img.convert("RGB"))
+        return cv2.cvtColor(rgb_img, cv2.COLOR_RGB2BGR)
+    except Exception as e:
+        raise ValueError(f"Failed to render PDF page: {str(e)}")
+
+
 def read_image_with_orientation(input_source: Union[str, bytes, np.ndarray]) -> np.ndarray:
     """
-    Reads an image from a filepath, raw byte stream, or numpy array,
-    properly handling EXIF orientation metadata.
+    Reads an image or PDF from a filepath, raw byte stream, or numpy array,
+    properly handling EXIF orientation metadata and PDF page rasterization.
 
     Args:
-        input_source: Path to file, image bytes, or existing numpy BGR array.
+        input_source: Path to file, image/PDF bytes, or existing numpy BGR array.
 
     Returns:
         np.ndarray in BGR color format.
@@ -68,32 +89,59 @@ def read_image_with_orientation(input_source: Union[str, bytes, np.ndarray]) -> 
         return input_source.copy()
 
     if isinstance(input_source, bytes):
-        # Decode from memory bytes
+        # 1. Check for PDF header (%PDF)
+        if input_source.startswith(b"%PDF"):
+            return read_pdf_first_page(input_source)
+
+        # 2. Try OpenCV decode
         nparr = np.frombuffer(input_source, np.uint8)
         img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-        if img is None:
-            raise ValueError("Failed to decode image from bytes.")
-        return img
+        if img is not None:
+            return img
+
+        # 3. Try PIL decode (WEBP, TIFF, HEIC, etc.)
+        try:
+            import io
+            pil_img = Image.open(io.BytesIO(input_source))
+            pil_img = ImageOps.exif_transpose(pil_img)
+            rgb_img = np.array(pil_img.convert("RGB"))
+            return cv2.cvtColor(rgb_img, cv2.COLOR_RGB2BGR)
+        except Exception:
+            pass
+
+        # 4. Try PDF parser as last resort for bytes
+        try:
+            return read_pdf_first_page(input_source)
+        except Exception:
+            pass
+
+        raise ValueError("Failed to decode image or PDF from bytes.")
 
     if isinstance(input_source, str):
         if not os.path.exists(input_source):
-            raise FileNotFoundError(f"Input image file not found: {input_source}")
+            raise FileNotFoundError(f"Input file not found: {input_source}")
+
+        # Check for PDF extension
+        if input_source.lower().endswith(".pdf"):
+            return read_pdf_first_page(input_source)
 
         # Use PIL to read and automatically transpose based on EXIF orientation
         try:
             pil_img = Image.open(input_source)
             pil_img = ImageOps.exif_transpose(pil_img)
-            # Convert to RGB numpy array
             rgb_img = np.array(pil_img.convert("RGB"))
-            # Convert RGB to OpenCV BGR format
-            bgr_img = cv2.cvtColor(rgb_img, cv2.COLOR_RGB2BGR)
-            return bgr_img
+            return cv2.cvtColor(rgb_img, cv2.COLOR_RGB2BGR)
         except Exception:
             # Fallback to direct OpenCV read
             bgr_img = cv2.imread(input_source)
-            if bgr_img is None:
-                raise ValueError(f"Could not read image from path: {input_source}")
-            return bgr_img
+            if bgr_img is not None:
+                return bgr_img
+
+            # Try PDF parser if file has non-.pdf extension but contains PDF data
+            try:
+                return read_pdf_first_page(input_source)
+            except Exception:
+                raise ValueError(f"Could not read image or PDF from path: {input_source}")
 
     raise TypeError(f"Unsupported input source type: {type(input_source)}")
 

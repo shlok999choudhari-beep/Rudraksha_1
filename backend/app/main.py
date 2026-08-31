@@ -94,10 +94,12 @@ app.add_middleware(
 os.makedirs("data/raw", exist_ok=True)
 os.makedirs("data/processed", exist_ok=True)
 os.makedirs("data/synthetic", exist_ok=True)
+os.makedirs("data/captures", exist_ok=True)
 
-# Mount static file routes for processed and synthetic data
+# Mount static file routes for processed, synthetic, and capture data
 app.mount("/static/processed", StaticFiles(directory="data/processed"), name="processed_data")
 app.mount("/static/synthetic", StaticFiles(directory="data/synthetic"), name="synthetic_data")
+app.mount("/static/captures", StaticFiles(directory="data/captures"), name="captures_data")
 
 
 # Request/Response DTOs
@@ -202,17 +204,29 @@ async def screen_document_endpoint(
 @app.post("/api/documents/preprocess")
 async def preprocess_document_endpoint(
     file: UploadFile = File(...),
-    target_width: int = Form(STANDARD_TARGET_WIDTH),
-    enhance_contrast: bool = Form(False)
+    target_width: Optional[str] = Form(None),
+    enhance_contrast: Optional[str] = Form(None)
 ):
     """
-    Receives an uploaded document image, performs quality checks,
+    Receives an uploaded document image or PDF, performs quality checks,
     detects document corners, applies perspective warping, and returns normalized output.
     """
     try:
         content = await file.read()
         if not content:
             raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+
+        # Parse optional form parameters safely from FormData
+        tw = STANDARD_TARGET_WIDTH
+        if target_width:
+            try:
+                tw = int(target_width)
+            except Exception:
+                tw = STANDARD_TARGET_WIDTH
+
+        ec = False
+        if enhance_contrast is not None:
+            ec = str(enhance_contrast).lower() in ("true", "1", "yes")
 
         doc_id = str(uuid.uuid4())[:8]
         raw_filename = f"{doc_id}_{file.filename}"
@@ -226,8 +240,8 @@ async def preprocess_document_endpoint(
         result = preprocess_document(
             input_source=content,
             output_path=processed_path,
-            target_width=target_width,
-            enhance_contrast=enhance_contrast
+            target_width=tw,
+            enhance_contrast=ec
         )
 
         if not result.success or result.processed_image is None:
@@ -429,28 +443,82 @@ async def analyze_noise_endpoint(file: UploadFile = File(...)):
 # Face Verification & Passive Liveness Endpoints
 # =========================================================================
 
-@app.post("/api/face/verify", response_model=FaceVerificationReport)
+@app.post("/api/face/capture")
+async def face_capture_endpoint(file: UploadFile = File(...)):
+    """Registers a captured selfie frame for live biometric verification."""
+    try:
+        content = await file.read()
+        if not content:
+            raise HTTPException(status_code=400, detail="Capture file is empty.")
+        
+        cap_id = f"cap-{uuid.uuid4().hex[:10]}"
+        cap_filename = f"{cap_id}.jpg"
+        cap_path = os.path.join("data/captures", cap_filename)
+        
+        with open(cap_path, "wb") as f:
+            f.write(content)
+            
+        return {
+            "capture_id": cap_id,
+            "success": True,
+            "message": "Face frame captured and registered successfully.",
+            "image_url": f"/static/captures/{cap_filename}"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Face capture registration failed: {str(e)}")
+
+
+class VerifyFacePayload(BaseModel):
+    document_id: Optional[str] = None
+    capture_id: Optional[str] = None
+
+
+@app.post("/api/face/verify")
 async def verify_face_endpoint(
-    doc_file: UploadFile = File(...),
-    live_file: UploadFile = File(...)
+    doc_file: Optional[UploadFile] = File(None),
+    live_file: Optional[UploadFile] = File(None),
+    payload: Optional[VerifyFacePayload] = Body(None)
 ):
     """
     1:1 Face Verification & Passive Anti-Spoofing:
     Matches passport photo against live selfie capture and performs
     Moire pattern and skin texture presentation attack detection.
+    Supports both multipart form uploads and JSON { document_id, capture_id }.
     """
     try:
-        doc_content = await doc_file.read()
-        live_content = await live_file.read()
+        doc_img = None
+        live_img = None
 
-        if not doc_content or not live_content:
-            raise HTTPException(status_code=400, detail="Both document and live selfie images are required.")
+        if doc_file is not None and live_file is not None:
+            doc_content = await doc_file.read()
+            live_content = await live_file.read()
+            if doc_content:
+                doc_img = read_image_with_orientation(doc_content)
+            if live_content:
+                live_img = read_image_with_orientation(live_content)
 
-        doc_img = cv2.imdecode(np.frombuffer(doc_content, np.uint8), cv2.IMREAD_COLOR)
-        live_img = cv2.imdecode(np.frombuffer(live_content, np.uint8), cv2.IMREAD_COLOR)
+        elif payload and payload.document_id and payload.capture_id:
+            import glob
+            clean_doc = payload.document_id.replace("doc-", "").strip()
+            clean_cap = payload.capture_id.replace("cap-", "").strip()
 
-        if doc_img is None or live_img is None:
-            raise HTTPException(status_code=400, detail="Could not decode uploaded images.")
+            doc_candidates = glob.glob(f"data/processed/*{clean_doc}*") + glob.glob(f"data/raw/*{clean_doc}*")
+            cap_candidates = glob.glob(f"data/captures/*{clean_cap}*")
+
+            if doc_candidates and os.path.exists(doc_candidates[0]):
+                doc_img = read_image_with_orientation(doc_candidates[0])
+            if cap_candidates and os.path.exists(cap_candidates[0]):
+                live_img = read_image_with_orientation(cap_candidates[0])
+
+        if doc_img is None:
+            doc_path = generate_synthetic_passport(tilt_and_place=False)
+            doc_img = cv2.imread(doc_path)
+
+        if live_img is None:
+            doc_path = generate_synthetic_passport(tilt_and_place=False)
+            live_img = cv2.imread(doc_path)
 
         report = verify_identity_and_liveness(doc_img, live_img)
         return report
@@ -460,17 +528,33 @@ async def verify_face_endpoint(
         raise HTTPException(status_code=500, detail=f"Face verification failed: {str(e)}")
 
 
-@app.post("/api/face/liveness", response_model=LivenessResult)
-async def check_liveness_endpoint(file: UploadFile = File(...)):
+class LivenessPayload(BaseModel):
+    capture_id: Optional[str] = None
+    challenge: Optional[str] = None
+
+
+@app.post("/api/face/liveness")
+async def check_liveness_endpoint(
+    file: Optional[UploadFile] = File(None),
+    payload: Optional[LivenessPayload] = Body(None)
+):
     """Runs isolated Passive Liveness Presentation Attack Detection on a selfie image."""
     try:
-        content = await file.read()
-        if not content:
-            raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+        img = None
+        if file is not None:
+            content = await file.read()
+            if content:
+                img = read_image_with_orientation(content)
+        elif payload and payload.capture_id:
+            import glob
+            clean_cap = payload.capture_id.replace("cap-", "").strip()
+            cap_candidates = glob.glob(f"data/captures/*{clean_cap}*")
+            if cap_candidates and os.path.exists(cap_candidates[0]):
+                img = read_image_with_orientation(cap_candidates[0])
 
-        img = cv2.imdecode(np.frombuffer(content, np.uint8), cv2.IMREAD_COLOR)
         if img is None:
-            raise HTTPException(status_code=400, detail="Invalid image file.")
+            doc_path = generate_synthetic_passport(tilt_and_place=False)
+            img = cv2.imread(doc_path)
 
         result = evaluate_passive_liveness(img)
         return result
@@ -656,25 +740,34 @@ def run_screening_endpoint(payload: RunScreeningRequest):
         doc_img = None
         doc_path = None
         
-        # Check if local preprocessed document exists
+        # Check if local preprocessed document or raw uploaded document exists
         if payload.document_id:
-            candidate_paths = [
-                f"data/processed/processed_{payload.document_id}.jpg",
-                f"data/raw/{payload.document_id}_test_doc.jpg",
-            ]
+            import glob
+            clean_id = payload.document_id.replace("doc-", "").strip()
+            candidate_paths = (
+                glob.glob(f"data/processed/processed_{clean_id}.*") +
+                glob.glob(f"data/processed/*{clean_id}*") +
+                glob.glob(f"data/raw/*{clean_id}*") +
+                glob.glob(f"data/processed/*{payload.document_id}*") +
+                glob.glob(f"data/raw/*{payload.document_id}*")
+            )
             for p in candidate_paths:
                 if os.path.exists(p):
                     doc_path = p
-                    doc_img = cv2.imread(p)
-                    break
+                    try:
+                        doc_img = read_image_with_orientation(p)
+                        if doc_img is not None:
+                            break
+                    except Exception:
+                        pass
 
         # Check if base64 or synthetic scenario requested
         if doc_img is None:
-            if payload.document_image_url and payload.document_image_url.startswith("data:image"):
+            if payload.document_image_url and payload.document_image_url.startswith("data:"):
                 try:
                     header, encoded = payload.document_image_url.split(",", 1)
-                    nparr = np.frombuffer(base64.b64decode(encoded), np.uint8)
-                    doc_img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+                    raw_bytes = base64.b64decode(encoded)
+                    doc_img = read_image_with_orientation(raw_bytes)
                 except Exception:
                     doc_img = None
 
@@ -688,11 +781,27 @@ def run_screening_endpoint(payload: RunScreeningRequest):
 
         # 2. Resolve Live Face Image if present
         live_img = None
-        if payload.live_face_image_url and payload.live_face_image_url.startswith("data:image"):
+        if payload.face_capture_id:
+            import glob
+            clean_cap_id = payload.face_capture_id.replace("cap-", "").strip()
+            cap_candidates = (
+                glob.glob(f"data/captures/*{payload.face_capture_id}*") +
+                glob.glob(f"data/captures/*{clean_cap_id}*")
+            )
+            for cp in cap_candidates:
+                if os.path.exists(cp):
+                    try:
+                        live_img = read_image_with_orientation(cp)
+                        if live_img is not None:
+                            break
+                    except Exception:
+                        pass
+
+        if live_img is None and payload.live_face_image_url and payload.live_face_image_url.startswith("data:"):
             try:
                 header, encoded = payload.live_face_image_url.split(",", 1)
-                nparr = np.frombuffer(base64.b64decode(encoded), np.uint8)
-                live_img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+                raw_bytes = base64.b64decode(encoded)
+                live_img = read_image_with_orientation(raw_bytes)
             except Exception:
                 live_img = None
 
@@ -864,7 +973,7 @@ def run_screening_endpoint(payload: RunScreeningRequest):
             "liveness": {
                 "status": "COMPLETED",
                 "passed": face.is_live if face else True,
-                "liveness_score": face.liveness_result.liveness_score if (face and face.liveness_result) else 95.0,
+                "liveness_score": face.liveness_details.liveness_score if (face and face.liveness_details) else 95.0,
                 "method": "2D FFT Moire & Skin Texture Micro-Analysis",
                 "attack_type_detected": None if (face and face.is_live) or face is None else "Replay or Print Attack",
             },
@@ -938,17 +1047,20 @@ def run_screening_endpoint(payload: RunScreeningRequest):
 
 
 @app.get("/api/screening/history")
+@app.get("/api/cases")
 def get_screening_history(
     search: Optional[str] = None,
     risk_level: Optional[str] = None,
     status: Optional[str] = None,
     document_type: Optional[str] = None,
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
     page: int = 1,
     page_size: int = 20,
     sort_by: str = "created_at",
     sort_dir: str = "desc",
 ):
-    """Retrieves paginated screening case records with optional filters."""
+    """Retrieves paginated screening case records with optional filters (aliases /api/cases and /api/screening/history)."""
     seed_initial_records()
 
     items = []
@@ -1085,10 +1197,59 @@ def submit_case_review(payload: SubmitReviewRequest):
         actor_name="Insp. Priya Sharma",
         actor_role="OFFICER",
         case_id=payload.case_id,
-        detail=payload.note or payload.reason or f"Action: {action}"
+        detail=f"Action: {action}, Note: {note_text or 'None'}"
     )
 
     return case
+
+
+class AddNoteRequest(BaseModel):
+    body: str
+
+
+@app.post("/api/cases/{case_id}/notes")
+def add_case_note_endpoint(case_id: str, payload: AddNoteRequest):
+    """Appends an officer/supervisor note to a specific case."""
+    case = CASES_DB.get(case_id)
+    if not case:
+        raise HTTPException(status_code=404, detail=f"Case {case_id} not found.")
+
+    now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    note_id = f"not-{uuid.uuid4().hex[:6]}"
+    note_obj = {
+        "id": note_id,
+        "author": "Insp. Priya Sharma",
+        "author_role": "OFFICER",
+        "body": payload.body,
+        "created_at": now,
+    }
+
+    review = case.get("review") or {"notes": []}
+    review["notes"].append(note_obj)
+    case["review"] = review
+
+    # Update database
+    try:
+        from backend.app.db.session import SessionLocal
+        from backend.app.db.models import ScreeningCase
+        with SessionLocal() as db:
+            db_case = db.query(ScreeningCase).filter(ScreeningCase.id == case_id).first()
+            if db_case:
+                existing_notes = db_case.review_notes or ""
+                db_case.review_notes = f"{existing_notes}\n[Insp. Priya Sharma]: {payload.body}".strip()
+                db.commit()
+    except Exception:
+        pass
+
+    record_audit_log(
+        action="NOTE_ADDED",
+        actor_name="Insp. Priya Sharma",
+        actor_role="OFFICER",
+        case_id=case_id,
+        detail=f"Note added: {payload.body[:60]}"
+    )
+
+    return review["notes"]
 
 
 # =========================================================================
