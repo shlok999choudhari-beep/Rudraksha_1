@@ -4,6 +4,8 @@ uvicorn[standard]>=0.28.0
 pydantic>=2.6.0
 python-dotenv>=1.0.1
 requests>=2.31.0
+python-multipart>=0.0.9
+
 
 # Computer Vision, OCR & Forensics
 opencv-python>=4.10.0

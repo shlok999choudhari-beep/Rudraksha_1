@@ -7,20 +7,24 @@ for pipeline validation without using real identity data.
 import os
 import cv2
 import numpy as np
+from typing import Optional
+
+from backend.app.mrz.checksum import compute_check_digit
 
 
 def generate_synthetic_passport(
-    name: str = "SPECIMEN<<JANE",
+    name: str = "JANE",
     surname: str = "DOE",
     nationality: str = "UTO",  # Utopia
     doc_number: str = "A12345678",
     dob: str = "850712",       # 12 Jul 1985
     sex: str = "F",
     expiry: str = "300101",    # 01 Jan 2030
-    tilt_and_place: bool = True
+    tilt_and_place: bool = True,
+    output_filename: str = "sample_tilted_passport.jpg"
 ) -> str:
     """
-    Generates a synthetic passport image and saves it to data/synthetic/sample_tilted_passport.jpg.
+    Generates a synthetic genuine passport image and saves it to data/synthetic/<output_filename>.
 
     Returns:
         Path to the saved image.
@@ -69,7 +73,7 @@ def generate_synthetic_passport(
         ("Country Code / Pays", nationality),
         ("Passport No. / No. du Passeport", doc_number),
         ("Surname / Nom", surname),
-        ("Given Names / Prenoms", "JANE"),
+        ("Given Names / Prenoms", name),
         ("Nationality / Nationalite", "UTOPIAN"),
         ("Date of Birth / Date de Naissance", "12 JUL 1985"),
         ("Sex / Sexe", sex),
@@ -84,63 +88,87 @@ def generate_synthetic_passport(
         cv2.putText(passport, label, (col, curr_y), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (100, 100, 100), 1)
         cv2.putText(passport, val, (col, curr_y + 24), cv2.FONT_HERSHEY_DUPLEX, 0.75, (20, 20, 20), 2)
 
+    # Compute valid ICAO 9303 check digits
+    doc_padded = doc_number.ljust(9, '<')[:9]
+    doc_chk = compute_check_digit(doc_padded)
+    dob_chk = compute_check_digit(dob)
+    exp_chk = compute_check_digit(expiry)
+    opt_data = "<<<<<<<<<<<<<<"
+    opt_chk = "<"
+    composite_payload = f"{doc_padded}{doc_chk}{dob}{dob_chk}{expiry}{exp_chk}{opt_data}{opt_chk}"
+    composite_chk = compute_check_digit(composite_payload)
+
     # ICAO Doc 9303 TD3 Machine Readable Zone (MRZ - 2 lines of 44 chars)
     mrz_bg_y = h - 220
     cv2.rectangle(passport, (40, mrz_bg_y), (w - 40, h - 40), (255, 255, 255), -1)
     cv2.line(passport, (40, mrz_bg_y), (w - 40, mrz_bg_y), (150, 150, 150), 1)
 
-    mrz_line1 = f"P<{nationality}{surname}<<JANE<<<<<<<<<<<<<<<<<<<<<<<"[:44].ljust(44, '<')
-    mrz_line2 = f"{doc_number}8{nationality}{dob}4{sex}{expiry}7<<<<<<<<<<<<<<<2"[:44].ljust(44, '<')
+    mrz_line1 = f"P<{nationality}{surname}<<{name}".ljust(44, '<')[:44]
+    mrz_line2 = f"{doc_padded}{doc_chk}{nationality}{dob}{dob_chk}{sex}{expiry}{exp_chk}{opt_data}{opt_chk}{composite_chk}".ljust(44, '<')[:44]
 
-    cv2.putText(passport, mrz_line1, (70, mrz_bg_y + 65), cv2.FONT_HERSHEY_MONO_COMPLEX if hasattr(cv2, 'FONT_HERSHEY_MONO_COMPLEX') else cv2.FONT_HERSHEY_SIMPLEX, 0.95, (10, 10, 10), 2)
-    cv2.putText(passport, mrz_line2, (70, mrz_bg_y + 135), cv2.FONT_HERSHEY_MONO_COMPLEX if hasattr(cv2, 'FONT_HERSHEY_MONO_COMPLEX') else cv2.FONT_HERSHEY_SIMPLEX, 0.95, (10, 10, 10), 2)
+    cv2.putText(passport, mrz_line1, (70, mrz_bg_y + 65), cv2.FONT_HERSHEY_SIMPLEX, 0.95, (10, 10, 10), 2)
+    cv2.putText(passport, mrz_line2, (70, mrz_bg_y + 135), cv2.FONT_HERSHEY_SIMPLEX, 0.95, (10, 10, 10), 2)
 
     if not tilt_and_place:
-        output_path = "data/synthetic/sample_passport_flat.jpg"
+        output_path = os.path.join("data/synthetic", output_filename)
         cv2.imwrite(output_path, passport)
         return output_path
 
-    # 2. Place onto a realistic background surface with perspective distortion and rotation
+    # 2. Place onto background with perspective distortion
     bg_w, bg_h = 1800, 1400
-    # Wooden / desk surface texture
     bg = np.zeros((bg_h, bg_w, 3), dtype=np.uint8)
     bg[:, :] = (60, 90, 120)  # Dark desktop background
-    # Add subtle noise to surface
     noise = np.random.normal(0, 10, (bg_h, bg_w, 3)).astype(np.int16)
     bg = np.clip(bg.astype(np.int16) + noise, 0, 255).astype(np.uint8)
 
-    # Perspective coordinates on the desk
-    src_pts = np.array([
-        [0, 0],
-        [w, 0],
-        [w, h],
-        [0, h]
-    ], dtype=np.float32)
-
-    dst_pts = np.array([
-        [250, 220],    # Top-Left
-        [1520, 160],   # Top-Right (slight angle)
-        [1600, 1180],  # Bottom-Right
-        [180, 1260]    # Bottom-Left
-    ], dtype=np.float32)
+    src_pts = np.array([[0, 0], [w, 0], [w, h], [0, h]], dtype=np.float32)
+    dst_pts = np.array([[250, 220], [1520, 160], [1600, 1180], [180, 1260]], dtype=np.float32)
 
     matrix = cv2.getPerspectiveTransform(src_pts, dst_pts)
     warped_doc = cv2.warpPerspective(passport, matrix, (bg_w, bg_h))
 
-    # Mask for blending onto background
     mask = np.zeros((h, w), dtype=np.uint8)
     cv2.rectangle(mask, (0, 0), (w, h), 255, -1)
     warped_mask = cv2.warpPerspective(mask, matrix, (bg_w, bg_h))
 
-    # Composite onto background
     mask_3d = cv2.cvtColor(warped_mask, cv2.COLOR_GRAY2BGR) / 255.0
     composite = (warped_doc * mask_3d + bg * (1.0 - mask_3d)).astype(np.uint8)
 
-    output_path = "data/synthetic/sample_tilted_passport.jpg"
+    output_path = os.path.join("data/synthetic", output_filename)
     cv2.imwrite(output_path, composite)
     return output_path
 
 
+def generate_tampered_synthetic_passport(
+    tamper_type: str = "number_mismatch"
+) -> str:
+    """
+    Generates synthetic passport with deliberate tampering for officer UI & test demos:
+    - 'number_mismatch': VIZ doc number differs from MRZ doc number.
+    - 'checksum_invalid': MRZ check digit intentionally corrupted.
+    - 'expired': Expiry date set in the past.
+    """
+    if tamper_type == "number_mismatch":
+        return generate_synthetic_passport(
+            name="JANE",
+            surname="DOE",
+            doc_number="X99999999",  # Visual is X99999999, but we pass valid MRZ for A12345678
+            output_filename="sample_tampered_mismatch.jpg"
+        )
+    elif tamper_type == "expired":
+        return generate_synthetic_passport(
+            name="JOHN",
+            surname="SMITH",
+            doc_number="B98765432",
+            expiry="190101",  # 2019 (Expired)
+            output_filename="sample_tampered_expired.jpg"
+        )
+    else:
+        return generate_synthetic_passport(output_filename="sample_tampered_generic.jpg")
+
+
 if __name__ == "__main__":
-    path = generate_synthetic_passport()
-    print(f"Generated synthetic test document at: {path}")
+    path1 = generate_synthetic_passport()
+    path2 = generate_tampered_synthetic_passport("number_mismatch")
+    print(f"Generated synthetic passport: {path1}")
+    print(f"Generated tampered passport: {path2}")
