@@ -8,7 +8,7 @@ Handles image uploads to Supabase Storage buckets:
 import os
 import uuid
 import base64
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Any
 import cv2
 import numpy as np
 
