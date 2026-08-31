@@ -3,9 +3,15 @@ MRZ Extraction and OCR Preprocessing Engine.
 Locates the Machine Readable Zone (MRZ) on ID documents using morphological operations,
 enhances contrast, and extracts text lines with character disambiguation heuristics.
 """
+import os
 import re
 from typing import Tuple, List, Optional, Dict, Any
 from pydantic import BaseModel
+
+# Ensure Tesseract finds bundled traineddata across cloud environments
+_TESSDATA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "ocr", "tessdata"))
+if os.path.exists(_TESSDATA_DIR):
+    os.environ["TESSDATA_PREFIX"] = _TESSDATA_DIR
 
 from backend.app.mrz.parser import parse_mrz, MRZParsedResult
 

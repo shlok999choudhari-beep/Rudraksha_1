@@ -3,11 +3,17 @@ Surya OCR & Document Layout Recognition Engine.
 Performs text line detection, polygon segmentation, character recognition,
 and extracts both Visual Inspection Zone (VIZ) fields and Machine Readable Zone (MRZ) lines.
 """
+import os
 import re
 import cv2
 import numpy as np
 from typing import List, Dict, Tuple, Optional, Any
 from pydantic import BaseModel, Field
+
+# Ensure Tesseract finds bundled traineddata across cloud environments
+_TESSDATA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "tessdata"))
+if os.path.exists(_TESSDATA_DIR):
+    os.environ["TESSDATA_PREFIX"] = _TESSDATA_DIR
 
 from backend.app.ocr.cross_validation import VIZDataPayload
 from backend.app.mrz.parser import parse_mrz, MRZParsedResult
