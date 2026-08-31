@@ -69,6 +69,7 @@ from backend.app.store import (
     CASES_DB,
     AUDIT_LOGS_DB,
     record_audit_log,
+    seed_initial_records,
 )
 
 # Initialize FastAPI application
@@ -517,8 +518,53 @@ class LoginPayload(BaseModel):
 
 @app.post("/api/auth/login")
 def login_endpoint(payload: LoginPayload):
-    """Authenticates officer, supervisor, auditor, or admin credentials."""
-    user = USERS_DB.get(payload.email.lower().strip())
+    """Authenticates officer, supervisor, auditor, or admin credentials from database."""
+    from backend.app.db.session import SessionLocal
+    from backend.app.db.models import User
+    from backend.app.db.auth import verify_password, generate_session_token
+
+    email_clean = payload.email.lower().strip()
+    try:
+        with SessionLocal() as db:
+            db_user = db.query(User).filter(User.email == email_clean).first()
+            if db_user:
+                is_valid = verify_password(payload.password, db_user.password_hash, db_user.salt)
+                if not is_valid:
+                    raise HTTPException(status_code=401, detail="Incorrect email or password.")
+
+                now = datetime.datetime.now(datetime.timezone.utc)
+                db_user.last_login_at = now
+                db.commit()
+
+                token = generate_session_token(db_user.id, db_user.email, db_user.role)
+                session_user = {
+                    "id": db_user.id,
+                    "name": db_user.full_name,
+                    "email": db_user.email,
+                    "role": db_user.role,
+                    "badge_number": db_user.badge_number,
+                    "station": db_user.station_id,
+                    "last_login_at": now.isoformat(),
+                }
+                record_audit_log(
+                    action="USER_LOGIN",
+                    actor_name=db_user.full_name,
+                    actor_role=db_user.role,
+                    actor_id=db_user.id,
+                    detail=f"role={db_user.role} station={db_user.station_id}"
+                )
+                return {
+                    "token": token,
+                    "expires_at": (now + datetime.timedelta(hours=8)).isoformat(),
+                    "user": session_user,
+                }
+    except HTTPException:
+        raise
+    except Exception:
+        pass
+
+    # Fallback to USERS_DB
+    user = USERS_DB.get(email_clean)
     if not user or user["password"] != payload.password:
         raise HTTPException(status_code=401, detail="Incorrect email or password.")
 
@@ -548,7 +594,24 @@ def login_endpoint(payload: LoginPayload):
 
 @app.get("/api/auth/me")
 def me_endpoint():
-    """Returns the default active officer session profile."""
+    """Returns the default active officer session profile from database."""
+    from backend.app.db.session import SessionLocal
+    from backend.app.db.models import User
+    try:
+        with SessionLocal() as db:
+            officer = db.query(User).filter(User.role == "OFFICER").first()
+            if officer:
+                return {
+                    "id": officer.id,
+                    "name": officer.full_name,
+                    "email": officer.email,
+                    "role": officer.role,
+                    "badge_number": officer.badge_number,
+                    "station": officer.station_id,
+                }
+    except Exception:
+        pass
+
     officer = USERS_DB["officer@veriguard.gov"]
     return {
         "id": officer["id"],
@@ -851,8 +914,10 @@ def run_screening_endpoint(payload: RunScreeningRequest):
             },
         }
 
-        # Store in backend cases table
+        # Store in backend cases table and SQL database
         CASES_DB[case_id] = case_result
+        from backend.app.store import save_case_to_db
+        save_case_to_db(case_result)
 
         # Log audit entry
         record_audit_log(
@@ -881,32 +946,38 @@ def get_screening_history(
     page: int = 1,
     page_size: int = 20,
     sort_by: str = "created_at",
-    sort_dir: str = "desc"
+    sort_dir: str = "desc",
 ):
-    """Lists historical cases with pagination and multi-field filtering."""
+    """Retrieves paginated screening case records with optional filters."""
+    seed_initial_records()
+
     items = []
-    for cid, c in CASES_DB.items():
+    for c_id, c in CASES_DB.items():
         doc = c.get("document", {})
-        risk_obj = c.get("risk", {})
+        risk = c.get("risk", {})
         item = {
-            "case_id": cid,
-            "created_at": c.get("created_at"),
+            "case_id": c_id,
+            "status": c.get("status", "COMPLETED"),
             "document_type": doc.get("type", "PASSPORT"),
-            "holder_name": doc.get("holder_name", "UNKNOWN"),
             "document_number": doc.get("document_number", "N/A"),
-            "risk_score": risk_obj.get("overall_score", 0),
-            "risk_level": risk_obj.get("level", "LOW"),
-            "status": c.get("status", "REVIEWED"),
-            "officer_name": c.get("created_by", {}).get("name", "Officer"),
-            "station": "IGI Airport (Terminal 3)",
-            "processing_time_ms": c.get("processing_time_ms", 380),
-            "partial": False,
+            "holder_name": doc.get("holder_name", "N/A"),
+            "nationality": doc.get("nationality", "N/A"),
+            "risk_score": risk.get("overall_score", 0),
+            "risk_level": risk.get("level", "LOW"),
+            "created_at": c.get("created_at"),
+            "completed_at": c.get("completed_at"),
+            "processing_time_ms": c.get("processing_time_ms", 350.0),
+            "created_by": c.get("created_by", {"id": "usr-officer-01", "name": "Insp. Priya Sharma", "role": "OFFICER"}),
         }
 
-        # Filter by search
+        # Filter by search term
         if search:
             s = search.lower()
-            if s not in cid.lower() and s not in item["holder_name"].lower() and s not in item["document_number"].lower():
+            if (
+                s not in item["document_number"].lower()
+                and s not in item["holder_name"].lower()
+                and s not in item["case_id"].lower()
+            ):
                 continue
 
         # Filter by risk level
@@ -961,7 +1032,7 @@ class SubmitReviewRequest(BaseModel):
 
 @app.post("/api/screening/review")
 def submit_case_review(payload: SubmitReviewRequest):
-    """Records officer adjudication or supervisor escalation on a case."""
+    """Records officer adjudication or supervisor escalation on a case in memory and database."""
     case = CASES_DB.get(payload.case_id)
     if not case:
         raise HTTPException(status_code=404, detail=f"Case {payload.case_id} not found.")
@@ -984,8 +1055,8 @@ def submit_case_review(payload: SubmitReviewRequest):
     review["reviewed_by"] = "Insp. Priya Sharma"
     review["reviewed_at"] = now
 
-    if payload.note or payload.reason:
-        note_text = payload.note or payload.reason
+    note_text = payload.note or payload.reason
+    if note_text:
         review["notes"].append({
             "id": f"not-{uuid.uuid4().hex[:6]}",
             "author": "Insp. Priya Sharma",
@@ -994,6 +1065,20 @@ def submit_case_review(payload: SubmitReviewRequest):
             "created_at": now,
         })
     case["review"] = review
+
+    # Update SQL database record
+    try:
+        from backend.app.db.session import SessionLocal
+        from backend.app.db.models import ScreeningCase
+        with SessionLocal() as db:
+            db_case = db.query(ScreeningCase).filter(ScreeningCase.id == payload.case_id).first()
+            if db_case:
+                db_case.status = case["status"]
+                db_case.review_decision = action
+                db_case.review_notes = note_text
+                db.commit()
+    except Exception:
+        pass
 
     record_audit_log(
         action=audit_action,

@@ -47,3 +47,9 @@ data/*.tar.gz
 # Logs and outputs
 logs/
 *.log
+
+# Local Database Files
+*.db
+*.sqlite
+*.sqlite3
+
