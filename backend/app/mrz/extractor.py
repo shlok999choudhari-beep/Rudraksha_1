@@ -178,13 +178,31 @@ def extract_and_parse_mrz_from_image(
             except Exception:
                 pass
 
-        # 3. Try PyTesseract if installed
+        # 3. Try PyTesseract on multiple image variants (raw crop, lower band, preprocessed)
         if not lines:
             try:
                 import pytesseract
                 custom_config = r'--oem 3 --psm 6 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<'
-                ocr_raw = pytesseract.image_to_string(preprocessed, config=custom_config)
-                lines = clean_ocr_mrz_text(ocr_raw)
+                
+                # Try raw crop
+                raw_txt = pytesseract.image_to_string(mrz_crop, config=custom_config)
+                lines = clean_ocr_mrz_text(raw_txt)
+                
+                # Try lower 25% of document
+                if not lines:
+                    lower_crop = image[int(h * 0.72):, :]
+                    raw_txt = pytesseract.image_to_string(lower_crop, config=custom_config)
+                    lines = clean_ocr_mrz_text(raw_txt)
+                
+                # Try binarized crop
+                if not lines:
+                    raw_txt = pytesseract.image_to_string(preprocessed, config=custom_config)
+                    lines = clean_ocr_mrz_text(raw_txt)
+
+                # Try whole document image with PSM 11 / PSM 6
+                if not lines:
+                    raw_txt = pytesseract.image_to_string(image, config=r'--oem 3 --psm 6')
+                    lines = clean_ocr_mrz_text(raw_txt)
             except Exception:
                 pass
 
@@ -197,11 +215,12 @@ def extract_and_parse_mrz_from_image(
                 pass
 
         if not lines:
-            # If no OCR output could be resolved, construct from standardized TD3 format
-            lines = [
-                "P<UTODOE<<JANE<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<",
-                "A123456787UTO8507122F3001018<<<<<<<<<<<<<<00"
-            ]
+            return MRZExtractionResult(
+                success=False,
+                mrz_text="",
+                mrz_lines=[],
+                error_message="No valid ICAO MRZ lines detected on document."
+            )
 
         parsed = parse_mrz(lines)
         return MRZExtractionResult(
