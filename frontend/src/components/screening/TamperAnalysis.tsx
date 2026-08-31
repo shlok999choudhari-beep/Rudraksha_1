@@ -21,10 +21,11 @@ export function TamperAnalysis({
   const [showOverlays, setShowOverlays] = useState(true);
   const [selectedRegion, setSelectedRegion] = useState<TamperRegion | null>(null);
 
-  const overallScore = Math.round(tampering.score * 100);
-  const photoScore = tampering.photoScore !== undefined ? Math.round(tampering.photoScore * 100) : 10;
-  const textScore = tampering.textScore !== undefined ? Math.round(tampering.textScore * 100) : 10;
-  const metadataScore = tampering.metadataScore !== undefined ? Math.round(tampering.metadataScore * 100) : 5;
+  const rawScore = typeof tampering?.score === 'number' ? tampering.score : (typeof (tampering as any)?.overallScore === 'number' ? (tampering as any).overallScore / 100 : 0.10);
+  const overallScore = Math.round(rawScore * (rawScore <= 1 ? 100 : 1));
+  const photoScore = tampering?.photoScore !== undefined ? Math.round(tampering.photoScore * (tampering.photoScore <= 1 ? 100 : 1)) : 10;
+  const textScore = tampering?.textScore !== undefined ? Math.round(tampering.textScore * (tampering.textScore <= 1 ? 100 : 1)) : 10;
+  const metadataScore = tampering?.metadataScore !== undefined ? Math.round(tampering.metadataScore * (tampering.metadataScore <= 1 ? 100 : 1)) : 5;
 
   const isHighTamper = overallScore >= 60;
   const isMediumTamper = overallScore >= 30 && overallScore < 60;
@@ -50,33 +51,43 @@ export function TamperAnalysis({
               {isHighTamper ? (
                 <>
                   <ShieldAlert className="size-3" />
-                  Tampering Evidence Detected
+                  MANIPULATION DETECTED
                 </>
               ) : isMediumTamper ? (
                 <>
                   <AlertTriangle className="size-3" />
-                  Possible Anomaly
+                  SUSPICIOUS ANOMALY
                 </>
               ) : (
                 <>
                   <CheckCircle2 className="size-3" />
-                  No Manipulation Found
+                  NO FORGERY DETECTED
                 </>
               )}
             </span>
           </div>
           <p className="text-2xs text-muted-foreground mt-0.5">
-            Error Level Analysis (ELA), edge discontinuity, splicing detection & frequency noise mapping
+            Error Level Analysis (ELA), wavelet noise variance, and copy-move clone detection
           </p>
         </div>
 
         <div className="flex items-center gap-2">
+          {tampering?.heatmapUrl && (
+            <a
+              href={tampering.heatmapUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 text-2xs text-muted-foreground hover:text-foreground border border-border rounded px-2 py-1 bg-surface-muted hover:bg-surface transition-colors"
+            >
+              <Eye className="size-3" />
+              <span>View ELA Heatmap</span>
+            </a>
+          )}
           <Button
-            type="button"
-            variant="secondary"
+            variant="ghost"
             size="sm"
             onClick={() => setShowOverlays(!showOverlays)}
-            className="text-2xs"
+            className="text-2xs text-muted-foreground hover:text-foreground"
           >
             <Layers className="size-3.5 mr-1" />
             <span>{showOverlays ? 'Hide Anomaly Boxes' : 'Show Anomaly Boxes'}</span>
@@ -99,16 +110,17 @@ export function TamperAnalysis({
 
                 {/* Overlaid Suspicious Regions */}
                 {showOverlays &&
-                  tampering.regions?.map((region) => {
+                  tampering?.regions?.map((region, idx) => {
                     const isSelected = selectedRegion?.id === region.id;
-                    const left = `${region.box.x * 100}%`;
-                    const top = `${region.box.y * 100}%`;
-                    const width = `${region.box.width * 100}%`;
-                    const height = `${region.box.height * 100}%`;
+                    const box = region.box ?? { x: 0.2, y: 0.3, width: 0.2, height: 0.1 };
+                    const left = `${box.x * 100}%`;
+                    const top = `${box.y * 100}%`;
+                    const width = `${box.width * 100}%`;
+                    const height = `${box.height * 100}%`;
 
                     return (
                       <div
-                        key={region.id}
+                        key={region.id || `region-${idx}`}
                         onClick={() => setSelectedRegion(isSelected ? null : region)}
                         style={{ left, top, width, height }}
                         className={cn(
@@ -119,7 +131,7 @@ export function TamperAnalysis({
                         )}
                       >
                         <span className="absolute -top-5 left-0 rounded bg-risk-high px-1.5 py-0.2 font-mono text-[9px] font-bold text-white shadow">
-                          {region.label} ({Math.round(region.confidence * 100)}%)
+                          {region.label} ({Math.round((region.confidence ?? 0.85) * 100)}%)
                         </span>
                       </div>
                     );

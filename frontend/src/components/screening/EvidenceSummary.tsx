@@ -82,24 +82,26 @@ export function EvidenceSummary({ evidence, reasons, className }: EvidenceSummar
 
       {/* Categorized Evidence Groups Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {evidence.map((group) => {
-          const categoryLabel = RISK_CATEGORY_LABELS[group.category] ?? group.category;
+        {evidence?.map((group, groupIdx) => {
+          const categoryLabel = RISK_CATEGORY_LABELS[group.category] ?? group.category ?? 'Evidence Group';
+          const items = group.items ?? (group as any).signals ?? [];
 
           return (
             <div
-              key={group.category}
+              key={group.category || `group-${groupIdx}`}
               className="rounded-xl border border-border bg-surface-muted/30 p-3.5 space-y-2"
             >
               <div className="flex items-center justify-between border-b border-border/60 pb-2">
                 <span className="text-xs font-semibold text-foreground">{categoryLabel}</span>
                 <span className="text-[10px] font-mono text-muted-foreground uppercase">
-                  {group.items.length} checks
+                  {items.length} checks
                 </span>
               </div>
 
               <div className="space-y-1.5">
-                {group.items.map((item, idx) => {
-                  const cfg = VERDICT_CONFIG[item.verdict] ?? VERDICT_CONFIG.OK;
+                {items.map((item: any, idx: number) => {
+                  const itemVerdict = item.verdict ?? (item.severity === 'CRITICAL' ? 'ATTENTION' : 'OK');
+                  const cfg = VERDICT_CONFIG[itemVerdict as keyof typeof VERDICT_CONFIG] ?? VERDICT_CONFIG.OK;
                   const Icon = cfg.icon;
 
                   return (
@@ -112,16 +114,16 @@ export function EvidenceSummary({ evidence, reasons, className }: EvidenceSummar
                         <span
                           className={cn(
                             'text-xs',
-                            item.verdict === 'ATTENTION'
+                            itemVerdict === 'ATTENTION'
                               ? 'font-medium text-risk-high'
                               : 'text-foreground'
                           )}
                         >
                           {item.label}
                         </span>
-                        {item.detail && (
+                        {(item.detail || item.value) && (
                           <p className="text-[11px] font-mono text-muted-foreground truncate">
-                            {item.detail}
+                            {item.detail || item.value}
                           </p>
                         )}
                       </div>

@@ -46,3 +46,4 @@ export {
 export { SegmentedTabs, UnderlineTabs, type TabItem } from './Tabs';
 export { ToastProvider, useToast, type Toast, type ToastTone } from './Toast';
 export { InfoHint, Tooltip } from './Tooltip';
+export { ErrorBoundary } from './ErrorBoundary';

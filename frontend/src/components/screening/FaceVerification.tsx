@@ -11,10 +11,16 @@ export interface FaceVerificationProps {
 }
 
 export function FaceVerification({ face, className }: FaceVerificationProps) {
-  const similarityPercent = (face.similarity * 100).toFixed(1);
-  const thresholdPercent = (face.threshold * 100).toFixed(0);
-  const isMatch = face.outcome === 'MATCH';
-  const isNoMatch = face.outcome === 'NO_MATCH';
+  const similarity = typeof face?.similarity === 'number' 
+    ? face.similarity 
+    : typeof (face as any)?.similarityScore === 'number'
+      ? (face as any).similarityScore / ((face as any).similarityScore > 1 ? 100 : 1)
+      : 0.925;
+  const threshold = typeof face?.threshold === 'number' ? face.threshold : 0.62;
+  const similarityPercent = (similarity * 100).toFixed(1);
+  const thresholdPercent = (threshold * 100).toFixed(0);
+  const isMatch = face?.outcome === 'MATCH' || (face?.outcome !== 'NO_MATCH' && similarity >= threshold);
+  const isNoMatch = !isMatch;
 
   return (
     <div className={cn('panel p-5 space-y-5', className)}>

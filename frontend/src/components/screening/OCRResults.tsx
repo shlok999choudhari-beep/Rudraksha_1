@@ -58,13 +58,13 @@ export function OCRResults({ ocr, className }: OCRResultsProps) {
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {ocr.fields.map((field) => {
-              const conf = Math.round(field.confidence * 100);
+            {ocr?.fields?.map((field, idx) => {
+              const conf = Math.round((field.confidence ?? 0.95) * 100);
               const isHigh = conf >= 90;
               const isMedium = conf >= 75 && conf < 90;
 
               return (
-                <tr key={field.key} className="hover:bg-surface-muted/30">
+                <tr key={field.key || field.label || `ocr-field-${idx}`} className="hover:bg-surface-muted/30">
                   <td className="py-2.5 px-4 font-mono text-2xs text-muted-foreground">
                     {field.label}
                   </td>

@@ -11,7 +11,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { PageContainer } from '@/components/layout/PageContainer';
-import { Button } from '@/components/ui/Button';
+import { Button, ErrorBoundary } from '@/components/ui';
 import {
   ScreeningStepper,
   type ScreeningStep,
@@ -329,67 +329,69 @@ export default function NewScreeningPage() {
 
         {/* STEP 4: SCREENING REPORT & EVIDENCE */}
         {currentStep === 4 && screeningResult && (
-          <div className="space-y-6">
-            {/* Hero Risk Assessment Header */}
-            <RiskScore assessment={screeningResult.risk} />
+          <ErrorBoundary>
+            <div className="space-y-6">
+              {/* Hero Risk Assessment Header */}
+              <RiskScore assessment={screeningResult.risk} />
 
-            {/* Evidence Breakdown Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              {/* Left Column (8 cols): Deep Forensics & Verifications */}
-              <div className="lg:col-span-8 space-y-6">
-                {/* Tampering Forensic Image Analysis */}
-                <TamperAnalysis
-                  tampering={screeningResult.tampering}
-                  documentImageUrl={screeningResult.document.imageUrl}
-                />
+              {/* Evidence Breakdown Grid */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                {/* Left Column (8 cols): Deep Forensics & Verifications */}
+                <div className="lg:col-span-8 space-y-6">
+                  {/* Tampering Forensic Image Analysis */}
+                  <TamperAnalysis
+                    tampering={screeningResult.tampering}
+                    documentImageUrl={screeningResult.document.imageUrl}
+                  />
 
-                {/* Face Biometrics Comparison */}
-                <FaceVerification face={screeningResult.face} />
+                  {/* Face Biometrics Comparison */}
+                  <FaceVerification face={screeningResult.face} />
 
-                {/* OCR vs MRZ Cross Validation */}
-                <CrossCheckResults crossCheck={screeningResult.crossCheck} />
+                  {/* OCR vs MRZ Cross Validation */}
+                  <CrossCheckResults crossCheck={screeningResult.crossCheck} />
 
-                {/* Deterministic Document Rules */}
-                <ValidationResults validation={screeningResult.validation} />
+                  {/* Deterministic Document Rules */}
+                  <ValidationResults validation={screeningResult.validation} />
 
-                {/* OCR Extracted Fields */}
-                <OCRResults ocr={screeningResult.ocr} />
+                  {/* OCR Extracted Fields */}
+                  <OCRResults ocr={screeningResult.ocr} />
 
-                {/* MRZ Details & Check Digits */}
-                <MRZResults mrz={screeningResult.mrz} />
+                  {/* MRZ Details & Check Digits */}
+                  <MRZResults mrz={screeningResult.mrz} />
 
-                {/* Liveness Verification */}
-                <LivenessResult liveness={screeningResult.liveness} />
+                  {/* Liveness Verification */}
+                  <LivenessResult liveness={screeningResult.liveness} />
 
-                {/* Database & Watchlist Check */}
-                <WatchlistResult watchlist={screeningResult.watchlist} />
+                  {/* Database & Watchlist Check */}
+                  <WatchlistResult watchlist={screeningResult.watchlist} />
 
-                {/* Duplicate Identity */}
-                <DuplicateIdentity duplicate={screeningResult.duplicate} />
-              </div>
+                  {/* Duplicate Identity */}
+                  <DuplicateIdentity duplicate={screeningResult.duplicate} />
+                </div>
 
-              {/* Right Column (4 cols): Risk Breakdown, Evidence Summary & Officer Review */}
-              <div className="lg:col-span-4 space-y-6">
-                {/* Evidence Summary List */}
-                <EvidenceSummary
-                  evidence={screeningResult.evidence}
-                  reasons={screeningResult.risk.reasons}
-                />
+                {/* Right Column (4 cols): Risk Breakdown, Evidence Summary & Officer Review */}
+                <div className="lg:col-span-4 space-y-6">
+                  {/* Evidence Summary List */}
+                  <EvidenceSummary
+                    evidence={screeningResult.evidence}
+                    reasons={screeningResult.risk.reasons}
+                  />
 
-                {/* Category Risk Breakdown */}
-                <RiskBreakdown items={screeningResult.risk.breakdown} />
+                  {/* Category Risk Breakdown */}
+                  <RiskBreakdown items={screeningResult.risk.breakdown} />
 
-                {/* Officer Action & Review Box */}
-                <OfficerActions
-                  caseId={screeningResult.caseId}
-                  status={screeningResult.status}
-                  review={screeningResult.review}
-                  onSubmitReview={handleReview}
-                  isSubmitting={submitReviewMutation.isPending}
-                />
+                  {/* Officer Action & Review Box */}
+                  <OfficerActions
+                    caseId={screeningResult.caseId}
+                    status={screeningResult.status}
+                    review={screeningResult.review}
+                    onSubmitReview={handleReview}
+                    isSubmitting={submitReviewMutation.isPending}
+                  />
+                </div>
               </div>
             </div>
-          </div>
+          </ErrorBoundary>
         )}
       </div>
     </PageContainer>
