@@ -171,34 +171,18 @@ def extract_and_parse_mrz_from_image(
             except Exception:
                 pass
 
-        # 2. Try EasyOCR via shared engine if available
-        if not lines:
-            try:
-                from backend.app.ocr.surya_engine import surya_engine
-                reader = surya_engine._get_easyocr_reader()
-                if reader:
-                    results = reader.readtext(mrz_crop, batch_size=1)
-                    extracted = [r[1] for r in results if r[1]]
-                    lines = clean_ocr_mrz_text("\n".join(extracted))
-                    if len(lines) < 2:
-                        results2 = reader.readtext(preprocessed, batch_size=1)
-                        extracted2 = [r[1] for r in results2 if r[1]]
-                        lines = clean_ocr_mrz_text("\n".join(extracted2))
-            except Exception:
-                pass
-
-        # 3. Fast Single-Pass PyTesseract MRZ Extraction (< 300ms)
+        # 1. Fast Single-Pass PyTesseract MRZ Extraction (< 300ms)
         if not lines:
             try:
                 import pytesseract
                 # Pass 1: MRZ Crop (fastest)
-                raw_txt = pytesseract.image_to_string(mrz_crop, config='--psm 6', timeout=2)
+                raw_txt = pytesseract.image_to_string(mrz_crop, config='--psm 6', timeout=4)
                 lines = clean_ocr_mrz_text(raw_txt)
 
                 # Pass 2: Lower 25% band if crop missed
                 if len(lines) < 2:
                     lower_band = image[int(h * 0.72):, :]
-                    raw_txt = pytesseract.image_to_string(lower_band, config='--psm 6', timeout=2)
+                    raw_txt = pytesseract.image_to_string(lower_band, config='--psm 6', timeout=4)
                     lines = clean_ocr_mrz_text(raw_txt)
             except Exception:
                 pass
