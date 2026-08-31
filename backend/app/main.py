@@ -139,45 +139,37 @@ def root():
     }
 
 
-@app.get("/api/test-step/{step_id}")
-def test_step_diagnostic(step_id: int):
-    """Pinpoints the exact sub-module causing issues on Railway Linux."""
-    import time, traceback
-    t0 = time.time()
+@app.post("/api/debug-mrz")
+async def debug_mrz_endpoint(payload: RunScreeningRequest):
+    """Debugs MRZ extraction on uploaded document image."""
     try:
-        doc_path = "data/synthetic/sample_tilted_passport.jpg"
-        if not os.path.exists(doc_path):
-            doc_path = generate_synthetic_passport(tilt_and_place=False)
-        img = cv2.imread(doc_path)
+        raw_b64 = payload.document_image_url
+        header, encoded = raw_b64.split(",", 1)
+        raw_bytes = base64.b64decode(encoded)
+        doc_img = read_image_with_orientation(raw_bytes)
         
-        if step_id == 1:
-            from backend.app.preprocessing import preprocess_document
-            res = preprocess_document(img)
-            return {"step": 1, "name": "preprocessing", "success": res.success, "time": round(time.time() - t0, 3)}
-
-        elif step_id == 2:
-            from backend.app.geometry import evaluate_passport_geometry
-            res = evaluate_passport_geometry(img)
-            return {"step": 2, "name": "geometry", "valid": res.is_layout_valid, "time": round(time.time() - t0, 3)}
-
-        elif step_id == 3:
-            from backend.app.ocr.surya_engine import surya_engine
-            res = surya_engine.detect_and_read_text(img)
-            return {"step": 3, "name": "ocr_layout", "lines": len(res.text_lines), "time": round(time.time() - t0, 3)}
-
-        elif step_id == 4:
-            from backend.app.tampering import analyze_document_tampering
-            res = analyze_document_tampering(img)
-            return {"step": 4, "name": "tampering", "score": res.tamper_risk_score, "time": round(time.time() - t0, 3)}
-
-        elif step_id == 5:
-            from backend.app.face import verify_identity_and_liveness
-            res = verify_identity_and_liveness(img, img)
-            return {"step": 5, "name": "face_liveness", "verified": res.is_verified, "time": round(time.time() - t0, 3)}
-
-        return {"step": step_id, "error": "unknown step"}
+        h, w = doc_img.shape[:2]
+        crop, bbox = crop_mrz_region(doc_img)
+        
+        raw_tess = ""
+        try:
+            import pytesseract
+            raw_tess = pytesseract.image_to_string(crop)
+        except Exception as e:
+            raw_tess = f"Tesseract error: {str(e)}"
+            
+        mrz_res = extract_and_parse_mrz_from_image(doc_img)
+        
+        return {
+            "image_size": [w, h],
+            "crop_bbox": bbox,
+            "raw_tesseract": raw_tess,
+            "mrz_lines": mrz_res.mrz_lines,
+            "parsed_data": mrz_res.parsed_data.model_dump() if mrz_res.parsed_data else None,
+            "error": mrz_res.error_message
+        }
     except Exception as e:
-        return {"step": step_id, "success": False, "error": str(e), "traceback": traceback.format_exc()}
+        return {"error": str(e)}
 
 
 @app.get("/health")
