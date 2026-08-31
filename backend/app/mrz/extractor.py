@@ -177,9 +177,13 @@ def extract_and_parse_mrz_from_image(
                 from backend.app.ocr.surya_engine import surya_engine
                 reader = surya_engine._get_easyocr_reader()
                 if reader:
-                    results = reader.readtext(preprocessed, batch_size=1, canvas_size=1200)
+                    results = reader.readtext(mrz_crop, batch_size=1)
                     extracted = [r[1] for r in results if r[1]]
                     lines = clean_ocr_mrz_text("\n".join(extracted))
+                    if len(lines) < 2:
+                        results2 = reader.readtext(preprocessed, batch_size=1)
+                        extracted2 = [r[1] for r in results2 if r[1]]
+                        lines = clean_ocr_mrz_text("\n".join(extracted2))
             except Exception:
                 pass
 

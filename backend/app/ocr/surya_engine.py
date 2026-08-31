@@ -44,14 +44,11 @@ class SuryaOCREngine:
         self._surya_loaded = False
 
     def _get_easyocr_reader(self):
-        # Prefer ultra-fast native OpenCV layout parser to avoid 175MB cloud download crashes
-        if os.getenv("ENABLE_EASYOCR_DOWNLOAD", "false").lower() != "true":
-            return None
         if self._easyocr_reader is None:
             try:
                 import torch
                 import easyocr
-                torch.set_num_threads(1)
+                torch.set_num_threads(2)
                 self._easyocr_reader = easyocr.Reader(['en'], gpu=False, verbose=False)
             except Exception:
                 self._easyocr_reader = False
@@ -78,37 +75,66 @@ class SuryaOCREngine:
         Executes OCR line detection and field extraction across normalized document canvas.
         """
         if image is None or image.size == 0:
-            raise ValueError("Invalid document image.")
+            return OCRDocumentLayoutResult(
+                raw_text="",
+                text_lines=[],
+                viz_data=VIZDataPayload(),
+                engine_name="None"
+            )
 
-        h, w = image.shape[:2]
         text_lines: List[TextLineBBox] = []
         raw_lines: List[str] = []
         engine_name = "VeriGuard OCR & Layout Engine"
 
-        # 1. PyTesseract Native OCR Inference
-        try:
-            import pytesseract
-            engine_name = "Tesseract OCR Engine"
-            # Extract word data with bounding boxes (max 2s timeout)
-            data = pytesseract.image_to_data(image, output_type=pytesseract.Output.DICT, timeout=2)
-            n_boxes = len(data.get('text', []))
-            for i in range(n_boxes):
-                t = data['text'][i].strip()
-                conf_val = float(data['conf'][i]) if data['conf'][i] != '-1' else 0.0
-                if t and len(t) > 1 and conf_val > 25:
-                    bx = int(data['left'][i])
-                    by = int(data['top'][i])
-                    bw = int(data['width'][i])
-                    bh = int(data['height'][i])
-                    text_lines.append(TextLineBBox(
-                        text=t,
-                        confidence=round(conf_val / 100.0, 2),
-                        bbox={"x": bx, "y": by, "w": bw, "h": bh},
-                        polygon=[[bx, by], [bx + bw, by], [bx + bw, by + bh], [bx, by + bh]]
-                    ))
-                    raw_lines.append(t)
-        except Exception:
-            pass
+        # 1. Deep Learning EasyOCR Engine (Primary)
+        reader = self._get_easyocr_reader()
+        if reader is not None:
+            try:
+                results = reader.readtext(image)
+                for bbox, text, conf in results:
+                    t = text.strip()
+                    if t and float(conf) > 0.15:
+                        pts = np.array(bbox, dtype=np.int32)
+                        bx = int(np.min(pts[:, 0]))
+                        by = int(np.min(pts[:, 1]))
+                        bw = int(np.max(pts[:, 0]) - bx)
+                        bh = int(np.max(pts[:, 1]) - by)
+                        text_lines.append(TextLineBBox(
+                            text=t,
+                            confidence=round(float(conf), 2),
+                            bbox={"x": bx, "y": by, "w": bw, "h": bh},
+                            polygon=pts.tolist()
+                        ))
+                        raw_lines.append(t)
+                if text_lines:
+                    engine_name = "EasyOCR Engine"
+            except Exception:
+                pass
+
+        # 2. PyTesseract Native OCR Inference (Fallback)
+        if not text_lines:
+            try:
+                import pytesseract
+                engine_name = "Tesseract OCR Engine"
+                data = pytesseract.image_to_data(image, output_type=pytesseract.Output.DICT, timeout=5)
+                n_boxes = len(data.get('text', []))
+                for i in range(n_boxes):
+                    t = data['text'][i].strip()
+                    conf_val = float(data['conf'][i]) if data['conf'][i] != '-1' else 0.0
+                    if t and len(t) > 1 and conf_val > 25:
+                        bx = int(data['left'][i])
+                        by = int(data['top'][i])
+                        bw = int(data['width'][i])
+                        bh = int(data['height'][i])
+                        text_lines.append(TextLineBBox(
+                            text=t,
+                            confidence=round(conf_val / 100.0, 2),
+                            bbox={"x": bx, "y": by, "w": bw, "h": bh},
+                            polygon=[[bx, by], [bx + bw, by], [bx + bw, by + bh], [bx, by + bh]]
+                        ))
+                        raw_lines.append(t)
+            except Exception:
+                pass
 
         # 2. Native Spatial Text Line Detection if PyTesseract not available
         if not text_lines:
