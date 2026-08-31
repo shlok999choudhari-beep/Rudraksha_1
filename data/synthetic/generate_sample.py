@@ -93,7 +93,7 @@ def generate_synthetic_passport(
     doc_chk = compute_check_digit(doc_padded)
     dob_chk = compute_check_digit(dob)
     exp_chk = compute_check_digit(expiry)
-    opt_data = "<<<<<<<<<<<<<<"
+    opt_data = "<" * 14
     opt_chk = "<"
     composite_payload = f"{doc_padded}{doc_chk}{dob}{dob_chk}{expiry}{exp_chk}{opt_data}{opt_chk}"
     composite_chk = compute_check_digit(composite_payload)

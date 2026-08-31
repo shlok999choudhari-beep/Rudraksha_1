@@ -27,7 +27,7 @@ export const API_TIMEOUT = Number(
 );
 
 export const DEMO_MODE =
-  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_DEMO_MODE) !== 'false';
+  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_DEMO_MODE) === 'true';
 
 /** Simulated per-request latency in demo mode, so loading states are real. */
 export const DEMO_LATENCY = {

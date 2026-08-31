@@ -36,27 +36,37 @@ class OCRDocumentLayoutResult(BaseModel):
 
 
 class SuryaOCREngine:
-    """Surya / Layout OCR Document Processor with multi-stage text extraction."""
+    """Multi-Backend Neural & Layout OCR Document Processor (EasyOCR / Surya / PyTesseract)."""
 
     def __init__(self, use_gpu: bool = False):
         self.use_gpu = use_gpu
-        self.model_loaded = False
-        self._try_load_surya_weights()
+        self._easyocr_reader = None
+        self._surya_loaded = False
 
-    def _try_load_surya_weights(self):
-        """Attempts to import and initialize surya neural weights if installed."""
-        try:
-            from surya.ocr import run_ocr
-            from surya.model.detection.model import load_model as load_det_model, load_processor as load_det_proc
-            from surya.model.recognition.model import load_model as load_rec_model, load_processor as load_rec_proc
-            self.run_ocr_fn = run_ocr
-            self.det_model = load_det_model()
-            self.det_processor = load_det_proc()
-            self.rec_model = load_rec_model()
-            self.rec_processor = load_rec_proc()
-            self.model_loaded = True
-        except Exception:
-            self.model_loaded = False
+    def _get_easyocr_reader(self):
+        if self._easyocr_reader is None:
+            try:
+                import easyocr
+                self._easyocr_reader = easyocr.Reader(['en'], gpu=self.use_gpu, verbose=False)
+            except Exception:
+                self._easyocr_reader = False
+        return self._easyocr_reader if self._easyocr_reader is not False else None
+
+    def _try_load_surya(self):
+        if not self._surya_loaded:
+            try:
+                from surya.ocr import run_ocr
+                from surya.model.detection.model import load_model as load_det_model, load_processor as load_det_proc
+                from surya.model.recognition.model import load_model as load_rec_model, load_processor as load_rec_proc
+                self.run_ocr_fn = run_ocr
+                self.det_model = load_det_model()
+                self.det_processor = load_det_proc()
+                self.rec_model = load_rec_model()
+                self.rec_processor = load_rec_proc()
+                self._surya_loaded = True
+            except Exception:
+                self._surya_loaded = False
+        return self._surya_loaded
 
     def detect_and_read_text(self, image: np.ndarray) -> OCRDocumentLayoutResult:
         """
@@ -68,11 +78,36 @@ class SuryaOCREngine:
         h, w = image.shape[:2]
         text_lines: List[TextLineBBox] = []
         raw_lines: List[str] = []
+        engine_name = "VeriGuard OCR & Layout Engine"
 
-        # 1. If Surya deep weights are loaded, run neural inference
-        if self.model_loaded:
+        # 1. Inference via EasyOCR
+        easy_reader = self._get_easyocr_reader()
+        if easy_reader is not None:
+            try:
+                engine_name = "EasyOCR Neural Engine"
+                results = easy_reader.readtext(image)
+                for (bbox_pts, text, conf) in results:
+                    clean_t = text.strip()
+                    if clean_t:
+                        # Convert 4-point polygon to x, y, w, h
+                        xs = [p[0] for p in bbox_pts]
+                        ys = [p[1] for p in bbox_pts]
+                        bx, by, bw, bh = int(min(xs)), int(min(ys)), int(max(xs) - min(xs)), int(max(ys) - min(ys))
+                        text_lines.append(TextLineBBox(
+                            text=clean_t,
+                            confidence=round(float(conf), 2),
+                            bbox={"x": bx, "y": by, "w": bw, "h": bh},
+                            polygon=[[int(p[0]), int(p[1])] for p in bbox_pts]
+                        ))
+                        raw_lines.append(clean_t)
+            except Exception:
+                pass
+
+        # 2. Inference via Surya OCR
+        elif self._try_load_surya():
             try:
                 from PIL import Image
+                engine_name = "Surya Neural OCR"
                 pil_img = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
                 predictions = self.run_ocr_fn(
                     [pil_img],
@@ -84,53 +119,55 @@ class SuryaOCREngine:
                 )
                 if predictions and len(predictions) > 0:
                     for line in predictions[0].text_lines:
-                        bbox = {
-                            "x": int(line.bbox[0]),
-                            "y": int(line.bbox[1]),
-                            "w": int(line.bbox[2] - line.bbox[0]),
-                            "h": int(line.bbox[3] - line.bbox[1])
-                        }
-                        text_lines.append(TextLineBBox(
-                            text=line.text.strip(),
-                            confidence=round(float(line.confidence), 2),
-                            bbox=bbox,
-                            polygon=line.polygon if hasattr(line, 'polygon') else None
-                        ))
-                        raw_lines.append(line.text.strip())
+                        clean_t = line.text.strip()
+                        if clean_t:
+                            bbox = {
+                                "x": int(line.bbox[0]),
+                                "y": int(line.bbox[1]),
+                                "w": int(line.bbox[2] - line.bbox[0]),
+                                "h": int(line.bbox[3] - line.bbox[1])
+                            }
+                            text_lines.append(TextLineBBox(
+                                text=clean_t,
+                                confidence=round(float(line.confidence), 2),
+                                bbox=bbox,
+                                polygon=line.polygon if hasattr(line, 'polygon') else None
+                            ))
+                            raw_lines.append(clean_t)
             except Exception:
                 pass
 
-        # 2. Extract MRZ band via morphological candidate detector
-        mrz_res = extract_and_parse_mrz_from_image(image)
-        mrz_lines = mrz_res.mrz_lines
+        # 3. Extract MRZ Lines from OCR output lines or via morphological candidate detector
+        mrz_candidate_lines = [
+            l.text.replace(' ', '').upper()
+            for l in text_lines
+            if len(l.text.replace(' ', '')) >= 25 and ('<' in l.text or l.text.startswith('P<') or l.text.startswith('V<') or l.text.startswith('I<'))
+        ]
 
-        # If offline/no OCR engine configured, extract standard valid ICAO Doc 9303 TD3 test vector
-        if not mrz_lines:
-            mrz_lines = [
-                "P<UTOERIKSSON<<ANNA<MARIA<<<<<<<<<<<<<<<<<<<",
-                "L898902C36UTO7408122F1204159ZE184226B<<<<<10"
-            ]
+        if not mrz_candidate_lines:
+            # Fallback to Morphological / OCR-B Character Extractor
+            mrz_res = extract_and_parse_mrz_from_image(image)
+            if mrz_res.mrz_lines:
+                mrz_candidate_lines = mrz_res.mrz_lines
 
-
-        # 3. Parse MRZ lines
+        # 4. Parse MRZ
         mrz_parsed = None
-        if mrz_lines and len(mrz_lines) >= 2:
+        if mrz_candidate_lines and len(mrz_candidate_lines) >= 2:
             try:
-                mrz_parsed = parse_mrz(mrz_lines)
+                mrz_parsed = parse_mrz(mrz_candidate_lines)
             except Exception:
                 pass
 
-        # 4. Extract / Derive VIZ Data Payload
+        # 5. Extract / Derive VIZ Data Payload dynamically from text lines
         viz_data = self._extract_viz_from_lines_and_mrz(text_lines, mrz_parsed)
 
-
         return OCRDocumentLayoutResult(
-            raw_text="\n".join(raw_lines) if raw_lines else "\n".join(mrz_lines),
+            raw_text="\n".join(raw_lines) if raw_lines else "\n".join(mrz_candidate_lines),
             text_lines=text_lines,
             viz_data=viz_data,
-            detected_mrz_lines=mrz_lines,
+            detected_mrz_lines=mrz_candidate_lines,
             mrz_parsed_result=mrz_parsed,
-            engine_name="Surya Neural OCR" if self.model_loaded else "VeriGuard Document OCR Engine"
+            engine_name=engine_name
         )
 
     def _extract_viz_from_lines_and_mrz(
@@ -140,9 +177,8 @@ class SuryaOCREngine:
     ) -> VIZDataPayload:
         """
         Synthesizes structured VIZ fields by parsing recognized text patterns,
-        with fallback to parsed MRZ ground truth.
+        with fallback to parsed MRZ values.
         """
-        # If MRZ is parsed, initialize baseline fields from MRZ data
         passport_no = mrz_parsed.document_number if mrz_parsed else "P12345678"
         surname = mrz_parsed.surname if mrz_parsed else "SHARMA"
         given_names = mrz_parsed.given_names if mrz_parsed else "AARAV"
@@ -151,20 +187,31 @@ class SuryaOCREngine:
         nationality = mrz_parsed.nationality if mrz_parsed else "IND"
         sex = mrz_parsed.sex if mrz_parsed else "M"
 
-
         # Regex scan over raw text lines for specific labels
         for line in text_lines:
             t = line.text.upper()
-            # Passport / Document No pattern (e.g. Passport No: X1234567)
+            
+            # Passport / Document No pattern (e.g. Passport No: X99999999 or A12345678)
             doc_m = re.search(r'(?:PASSPORT|DOC|NO|NUMBER)\s*[:.\s]?\s*([A-Z0-9]{7,9})', t)
             if doc_m:
                 passport_no = doc_m.group(1)
-            # Date patterns (DD/MM/YYYY or DD-MM-YYYY)
-            dates = re.findall(r'(\d{2}[/-]\d{2}[/-]\d{4})', t)
-            if "BIRTH" in t or "DOB" in t:
+
+            # Surname pattern
+            sur_m = re.search(r'(?:SURNAME|NOM)\s*[:.\s]?\s*([A-Z]{2,20})', t)
+            if sur_m:
+                surname = sur_m.group(1)
+
+            # Given Names pattern
+            giv_m = re.search(r'(?:GIVEN\s*NAMES?|PRENOMS?)\s*[:.\s]?\s*([A-Z\s]{2,30})', t)
+            if giv_m:
+                given_names = giv_m.group(1).strip()
+
+            # Date patterns (DD/MM/YYYY or DD MMM YYYY)
+            dates = re.findall(r'(\d{2}[/-]\d{2}[/-]\d{4}|\d{2}\s+[A-Z]{3}\s+\d{4})', t)
+            if "BIRTH" in t or "DOB" in t or "NAISSANCE" in t:
                 if dates:
                     dob = dates[0]
-            if "EXPIRY" in t or "EXP" in t:
+            if "EXPIRY" in t or "EXP" in t or "EXPIRATION" in t:
                 if dates:
                     expiry = dates[0]
 

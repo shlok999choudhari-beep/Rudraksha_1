@@ -520,11 +520,12 @@ def parse_mrz(raw_text_or_lines: str | List[str]) -> MRZParsedResult:
 
     if len(cleaned_lines) == 2:
         # Check TD3 (44 chars) or TD2 (36 chars)
-        avg_len = (len(cleaned_lines[0]) + len(cleaned_lines[1])) / 2
-        if avg_len >= 40:
-            return parse_td3(cleaned_lines[0], cleaned_lines[1])
+        l1, l2 = cleaned_lines[0], cleaned_lines[1]
+        is_td3 = l1.startswith("P<") or len(l1) >= 40 or len(l2) >= 40
+        if is_td3:
+            return parse_td3(l1.ljust(44, '<')[:44], l2.ljust(44, '<')[:44])
         else:
-            return parse_td2(cleaned_lines[0], cleaned_lines[1])
+            return parse_td2(l1.ljust(36, '<')[:36], l2.ljust(36, '<')[:36])
     elif len(cleaned_lines) == 3:
         # TD1 format (3x30)
         return parse_td1(cleaned_lines[0], cleaned_lines[1], cleaned_lines[2])
