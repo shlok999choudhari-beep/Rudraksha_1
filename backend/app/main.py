@@ -139,37 +139,7 @@ def root():
     }
 
 
-@app.post("/api/debug-mrz")
-async def debug_mrz_endpoint(payload: RunScreeningRequest):
-    """Debugs MRZ extraction on uploaded document image."""
-    try:
-        raw_b64 = payload.document_image_url
-        header, encoded = raw_b64.split(",", 1)
-        raw_bytes = base64.b64decode(encoded)
-        doc_img = read_image_with_orientation(raw_bytes)
-        
-        h, w = doc_img.shape[:2]
-        crop, bbox = crop_mrz_region(doc_img)
-        
-        raw_tess = ""
-        try:
-            import pytesseract
-            raw_tess = pytesseract.image_to_string(crop)
-        except Exception as e:
-            raw_tess = f"Tesseract error: {str(e)}"
-            
-        mrz_res = extract_and_parse_mrz_from_image(doc_img)
-        
-        return {
-            "image_size": [w, h],
-            "crop_bbox": bbox,
-            "raw_tesseract": raw_tess,
-            "mrz_lines": mrz_res.mrz_lines,
-            "parsed_data": mrz_res.parsed_data.model_dump() if mrz_res.parsed_data else None,
-            "error": mrz_res.error_message
-        }
-    except Exception as e:
-        return {"error": str(e)}
+
 
 
 @app.get("/health")
