@@ -288,13 +288,19 @@ export async function measureImageFile(file: File): Promise<ImageMetrics | null>
     const gray = new Float64Array(w * h);
     let sum = 0;
     let saturated = 0;
+    // Exclude bottom 35% (legitimate MRZ white band) from specular glare pixel count
+    const mrzCutoffY = h * 0.62;
 
-    for (let i = 0, p = 0; i < data.length; i += 4, p += 1) {
-      // Rec. 601 luma, matching OpenCV's BGR2GRAY coefficients.
-      const luma = 0.114 * data[i + 2] + 0.587 * data[i + 1] + 0.299 * data[i];
-      gray[p] = luma;
-      sum += luma;
-      if (luma >= 252) saturated += 1;
+    for (let y = 0; y < h; y += 1) {
+      for (let x = 0; x < w; x += 1) {
+        const p = y * w + x;
+        const i = p * 4;
+        // Rec. 601 luma, matching OpenCV's BGR2GRAY coefficients.
+        const luma = 0.114 * data[i + 2] + 0.587 * data[i + 1] + 0.299 * data[i];
+        gray[p] = luma;
+        sum += luma;
+        if (luma >= 253 && y < mrzCutoffY) saturated += 1;
+      }
     }
 
     const mean = sum / gray.length;
@@ -326,7 +332,7 @@ export async function measureImageFile(file: File): Promise<ImageMetrics | null>
       width: naturalWidth,
       height: naturalHeight,
       blurScore,
-      glareRatio: saturated / gray.length,
+      glareRatio: saturated / (w * mrzCutoffY || 1),
       meanBrightness: mean,
       contrastScore: contrast,
       // Edge detection is a server-side job; the client cannot claim it ran.
