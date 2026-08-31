@@ -40,7 +40,7 @@ def extract_face_crop(
     target_size: Tuple[int, int] = (160, 160)
 ) -> Tuple[Optional[np.ndarray], Optional[Dict[str, int]], float]:
     """
-    Detects and crops the primary face from an image.
+    Detects and crops the primary face from an image using YOLO / Haar cascade / ROI.
     
     Args:
         image: BGR image (Document or Live Selfie).
@@ -54,34 +54,14 @@ def extract_face_crop(
         return None, None, 0.0
 
     h, w = image.shape[:2]
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if len(image.shape) == 3 else image
 
-    # 1. Try Haar Cascade face detector
-    cascade = get_face_cascade()
-    faces = []
-    if cascade is not None:
-        try:
-            detected = cascade.detectMultiScale(
-                gray,
-                scaleFactor=1.1,
-                minNeighbors=4,
-                minSize=(int(min(w, h) * 0.10), int(min(w, h) * 0.10))
-            )
-            if len(detected) > 0:
-                faces = list(detected)
-        except Exception:
-            pass
+    # 1. Use YOLO Face Engine
+    from backend.app.face.yolo_face import yolo_face_detector
+    report = yolo_face_detector.detect_faces(image, is_document=is_document)
 
-    # 2. If face found, select best candidate
-    if faces:
-        # If document, favor faces located in left half (x < 0.5 * w)
-        if is_document:
-            faces.sort(key=lambda b: (b[0] < w * 0.45, b[2] * b[3]), reverse=True)
-        else:
-            # For live selfie, select largest centered face
-            faces.sort(key=lambda b: b[2] * b[3], reverse=True)
-
-        fx, fy, fw, fh = faces[0]
+    if report.primary_face is not None:
+        pf = report.primary_face
+        fx, fy, fw, fh = pf.x, pf.y, pf.w, pf.h
 
         # Add 15% margin padding around face
         pad_x = int(fw * 0.15)
@@ -92,13 +72,13 @@ def extract_face_crop(
         y2 = min(h, fy + fh + pad_y)
 
         crop = image[y1:y2, x1:x2]
-        resized = cv2.resize(crop, target_size, interpolation=cv2.INTER_AREA)
-        bbox = {"x": int(fx), "y": int(fy), "w": int(fw), "h": int(fh)}
-        return resized, bbox, 0.95
+        if crop.size > 0:
+            resized = cv2.resize(crop, target_size, interpolation=cv2.INTER_AREA)
+            bbox = {"x": int(fx), "y": int(fy), "w": int(fw), "h": int(fh)}
+            return resized, bbox, pf.confidence
 
-    # 3. Document fallback: Crop standard ICAO photo box coordinates if Haar detector missed synthetic/drawn face
+    # 2. Geometric ICAO Fallback for Document
     if is_document:
-        # Expected passport photo ROI: x in [0.05*w, 0.28*w], y in [0.18*h, 0.60*h]
         px1 = max(0, int(w * 0.05))
         py1 = max(0, int(h * 0.18))
         px2 = min(w, int(w * 0.29))
@@ -110,7 +90,7 @@ def extract_face_crop(
             bbox = {"x": px1, "y": py1, "w": px2 - px1, "h": py2 - py1}
             return resized, bbox, 0.70
 
-    # 4. Live selfie fallback: Center crop
+    # 3. Live selfie fallback: Center crop
     cw = int(w * 0.6)
     ch = int(h * 0.6)
     cx1 = (w - cw) // 2
@@ -119,3 +99,42 @@ def extract_face_crop(
     resized = cv2.resize(crop, target_size, interpolation=cv2.INTER_AREA)
     bbox = {"x": cx1, "y": cy1, "w": cw, "h": ch}
     return resized, bbox, 0.50
+
+
+def extract_document_faces(
+    image: np.ndarray,
+    target_size: Tuple[int, int] = (160, 160)
+) -> Dict[str, Any]:
+    """
+    Extracts both Primary Portrait Face and Secondary Ghost/Watermark Face.
+    """
+    from backend.app.face.yolo_face import yolo_face_detector
+    report = yolo_face_detector.detect_faces(image, is_document=True)
+
+    result = {
+        "primary_crop": None,
+        "primary_bbox": None,
+        "primary_conf": 0.0,
+        "ghost_crop": None,
+        "ghost_bbox": None,
+        "has_ghost_photo": report.ghost_face is not None,
+        "backend": report.inference_backend,
+        "latency_ms": report.latency_ms
+    }
+
+    if report.primary_face:
+        pf = report.primary_face
+        crop = image[max(0, pf.y):min(image.shape[0], pf.y + pf.h), max(0, pf.x):min(image.shape[1], pf.x + pf.w)]
+        if crop.size > 0:
+            result["primary_crop"] = cv2.resize(crop, target_size, interpolation=cv2.INTER_AREA)
+            result["primary_bbox"] = {"x": pf.x, "y": pf.y, "w": pf.w, "h": pf.h}
+            result["primary_conf"] = pf.confidence
+
+    if report.ghost_face:
+        gf = report.ghost_face
+        crop = image[max(0, gf.y):min(image.shape[0], gf.y + gf.h), max(0, gf.x):min(image.shape[1], gf.x + gf.w)]
+        if crop.size > 0:
+            result["ghost_crop"] = cv2.resize(crop, target_size, interpolation=cv2.INTER_AREA)
+            result["ghost_bbox"] = {"x": gf.x, "y": gf.y, "w": gf.w, "h": gf.h}
+
+    return result

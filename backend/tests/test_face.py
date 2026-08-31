@@ -172,3 +172,22 @@ def test_api_face_verify_endpoints(sample_face_a):
     )
     assert live_resp.status_code == 200
     assert "is_live" in live_resp.json()
+
+
+def test_yolo_face_extraction(sample_face_a):
+    """Tests YOLOFaceDetector and multi-face extraction."""
+    from backend.app.face.yolo_face import YOLOFaceDetector
+    from backend.app.face.extractor import extract_document_faces
+
+    detector = YOLOFaceDetector()
+    report = detector.detect_faces(sample_face_a, is_document=False)
+    assert report is not None
+    assert report.total_faces_detected >= 1
+    assert report.primary_face is not None
+    assert report.primary_face.confidence > 0.0
+
+    # Test document multi-face extraction
+    doc_res = extract_document_faces(sample_face_a)
+    assert doc_res["primary_crop"] is not None
+    assert doc_res["primary_bbox"] is not None
+

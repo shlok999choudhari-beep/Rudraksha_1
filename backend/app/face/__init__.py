@@ -37,5 +37,17 @@ __all__ = [
     "LivenessResult",
     "verify_identity_and_liveness",
     "FaceVerificationReport",
-    "encode_image_to_base64"
+    "encode_image_to_base64",
+    "YOLOFaceDetector",
+    "yolo_face_detector",
+    "YOLOExtractionReport",
+    "extract_document_faces"
 ]
+
+from backend.app.face.yolo_face import (
+    YOLOFaceDetector,
+    yolo_face_detector,
+    YOLOExtractionReport,
+)
+from backend.app.face.extractor import extract_document_faces
+
