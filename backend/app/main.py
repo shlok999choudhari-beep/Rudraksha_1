@@ -878,13 +878,21 @@ def run_screening_endpoint(payload: RunScreeningRequest):
                     except Exception:
                         pass
 
-        # Check if base64 or synthetic scenario requested
-        if doc_img is None:
-            if payload.document_image_url and payload.document_image_url.startswith("data:"):
+        # Check if base64 or URL image was provided
+        if doc_img is None and payload.document_image_url:
+            if payload.document_image_url.startswith("data:"):
                 try:
                     header, encoded = payload.document_image_url.split(",", 1)
                     raw_bytes = base64.b64decode(encoded)
                     doc_img = read_image_with_orientation(raw_bytes)
+                except Exception:
+                    doc_img = None
+            elif payload.document_image_url.startswith("http://") or payload.document_image_url.startswith("https://"):
+                try:
+                    import requests
+                    resp = requests.get(payload.document_image_url, timeout=10)
+                    if resp.status_code == 200:
+                        doc_img = read_image_with_orientation(resp.content)
                 except Exception:
                     doc_img = None
 
@@ -914,13 +922,22 @@ def run_screening_endpoint(payload: RunScreeningRequest):
                     except Exception:
                         pass
 
-        if live_img is None and payload.live_face_image_url and payload.live_face_image_url.startswith("data:"):
-            try:
-                header, encoded = payload.live_face_image_url.split(",", 1)
-                raw_bytes = base64.b64decode(encoded)
-                live_img = read_image_with_orientation(raw_bytes)
-            except Exception:
-                live_img = None
+        if live_img is None and payload.live_face_image_url:
+            if payload.live_face_image_url.startswith("data:"):
+                try:
+                    header, encoded = payload.live_face_image_url.split(",", 1)
+                    raw_bytes = base64.b64decode(encoded)
+                    live_img = read_image_with_orientation(raw_bytes)
+                except Exception:
+                    live_img = None
+            elif payload.live_face_image_url.startswith("http://") or payload.live_face_image_url.startswith("https://"):
+                try:
+                    import requests
+                    resp = requests.get(payload.live_face_image_url, timeout=10)
+                    if resp.status_code == 200:
+                        live_img = read_image_with_orientation(resp.content)
+                except Exception:
+                    live_img = None
 
         # 3. Execute Master Multi-Modal Screening
         report: MasterScreeningReport = screen_document_and_identity(doc_img, live_img)

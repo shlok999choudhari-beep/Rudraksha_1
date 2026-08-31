@@ -189,6 +189,16 @@ export function useCamera(options: UseCameraOptions = {}): UseCameraResult {
     [state],
   );
 
+  // Ensure video element receives stream when ready
+  useEffect(() => {
+    if (state === 'ready' && videoRef.current && streamRef.current) {
+      if (videoRef.current.srcObject !== streamRef.current) {
+        videoRef.current.srcObject = streamRef.current;
+        videoRef.current.play().catch(() => {});
+      }
+    }
+  }, [state]);
+
   useEffect(() => {
     if (autoStart) void start();
     return () => {
