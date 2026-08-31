@@ -166,14 +166,15 @@ def extract_and_parse_mrz_from_image(
             except Exception:
                 pass
 
-        # 2. Try EasyOCR if available
+        # 2. Try EasyOCR via shared engine if available
         if not lines:
             try:
-                import easyocr
-                reader = easyocr.Reader(['en'], gpu=False, verbose=False)
-                results = reader.readtext(preprocessed)
-                extracted = [r[1] for r in results if r[1]]
-                lines = clean_ocr_mrz_text("\n".join(extracted))
+                from backend.app.ocr.surya_engine import surya_engine
+                reader = surya_engine._get_easyocr_reader()
+                if reader:
+                    results = reader.readtext(preprocessed, batch_size=1, canvas_size=1200)
+                    extracted = [r[1] for r in results if r[1]]
+                    lines = clean_ocr_mrz_text("\n".join(extracted))
             except Exception:
                 pass
 

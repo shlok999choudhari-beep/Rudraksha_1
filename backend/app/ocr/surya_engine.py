@@ -46,10 +46,12 @@ class SuryaOCREngine:
     def _get_easyocr_reader(self):
         if self._easyocr_reader is None:
             try:
+                import os
                 import torch
                 import easyocr
-                torch.set_num_threads(2)
-                self._easyocr_reader = easyocr.Reader(['en'], gpu=self.use_gpu, verbose=False, quantize=False)
+                # Set single thread on low-memory cloud instance
+                torch.set_num_threads(1)
+                self._easyocr_reader = easyocr.Reader(['en'], gpu=False, verbose=False, download_enabled=True)
             except Exception:
                 self._easyocr_reader = False
         return self._easyocr_reader if self._easyocr_reader is not False else None
