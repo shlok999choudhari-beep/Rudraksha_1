@@ -183,30 +183,30 @@ def extract_and_parse_mrz_from_image(
             except Exception:
                 pass
 
-        # 3. Try PyTesseract on multiple image variants (raw crop, lower band, preprocessed)
+        # 3. Try PyTesseract on multiple image variants
         if not lines:
             try:
                 import pytesseract
-                custom_config = r'--oem 3 --psm 6 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<'
-                
-                # Try raw crop
-                raw_txt = pytesseract.image_to_string(mrz_crop, config=custom_config)
-                lines = clean_ocr_mrz_text(raw_txt)
-                
-                # Try lower 25% of document
-                if not lines:
-                    lower_crop = image[int(h * 0.72):, :]
-                    raw_txt = pytesseract.image_to_string(lower_crop, config=custom_config)
+                # Pass clean crop directly
+                for psm in [6, 11, 4, 3]:
+                    cfg = f'--psm {psm}'
+                    raw_txt = pytesseract.image_to_string(mrz_crop, config=cfg)
                     lines = clean_ocr_mrz_text(raw_txt)
+                    if len(lines) >= 2:
+                        break
                 
-                # Try binarized crop
-                if not lines:
-                    raw_txt = pytesseract.image_to_string(preprocessed, config=custom_config)
-                    lines = clean_ocr_mrz_text(raw_txt)
+                # Try lower 25% if crop missed
+                if len(lines) < 2:
+                    lower_band = image[int(h * 0.70):, :]
+                    for psm in [6, 11, 3]:
+                        raw_txt = pytesseract.image_to_string(lower_band, config=f'--psm {psm}')
+                        lines = clean_ocr_mrz_text(raw_txt)
+                        if len(lines) >= 2:
+                            break
 
-                # Try whole document image with PSM 11 / PSM 6
-                if not lines:
-                    raw_txt = pytesseract.image_to_string(image, config=r'--oem 3 --psm 6')
+                # Try full normalized image
+                if len(lines) < 2:
+                    raw_txt = pytesseract.image_to_string(image, config='--psm 6')
                     lines = clean_ocr_mrz_text(raw_txt)
             except Exception:
                 pass
