@@ -898,7 +898,7 @@ class RunScreeningRequest(BaseModel):
 
 
 @app.post("/api/screening/run")
-def run_screening_endpoint(payload: RunScreeningRequest):
+async def run_screening_endpoint(payload: RunScreeningRequest):
     """
     Executes full multi-modal screening pipeline across the 9 stages:
     (quality, ocr, mrz, validation, tampering, face, liveness, database, risk)
@@ -991,8 +991,9 @@ def run_screening_endpoint(payload: RunScreeningRequest):
                 except Exception:
                     live_img = None
 
-        # 3. Execute Master Multi-Modal Screening
-        report: MasterScreeningReport = screen_document_and_identity(doc_img, live_img)
+        # 3. Execute Master Multi-Modal Screening non-blockingly
+        import asyncio
+        report: MasterScreeningReport = await asyncio.to_thread(screen_document_and_identity, doc_img, live_img)
         risk = report.risk_assessment
 
         case_id = f"case-{uuid.uuid4().hex[:4]}-{uuid.uuid4().hex[:4]}"
