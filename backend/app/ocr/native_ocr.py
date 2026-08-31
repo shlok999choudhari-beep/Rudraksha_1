@@ -97,13 +97,13 @@ def extract_mrz_lines_from_image(image: np.ndarray) -> List[str]:
     gray = cv2.cvtColor(mrz_crop, cv2.COLOR_BGR2GRAY) if len(mrz_crop.shape) == 3 else mrz_crop
 
     # Contrast enhance & binarize
-    clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
-    enhanced = clahe.apply(gray)
-    _, thresh = cv2.threshold(enhanced, 0, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)
+    _, thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY_INV)
+    thresh[:10, :] = 0
+    thresh[-10:, :] = 0
 
     # 2. Find horizontal line boundaries by horizontal projection profile
-    h_proj = np.sum(thresh, axis=1)
-    peak_indices = np.where(h_proj > (np.max(h_proj) * 0.35))[0]
+    h_proj = np.sum(thresh > 0, axis=1)
+    peak_indices = np.where((h_proj > 20) & (h_proj < int(w * 0.85)))[0]
 
     if peak_indices.size == 0:
         return []
@@ -112,27 +112,24 @@ def extract_mrz_lines_from_image(image: np.ndarray) -> List[str]:
     line_ranges = []
     current_start = peak_indices[0]
     for idx in range(1, len(peak_indices)):
-        if peak_indices[idx] > peak_indices[idx - 1] + 4:
+        if peak_indices[idx] > peak_indices[idx - 1] + 5:
             line_ranges.append((current_start, peak_indices[idx - 1]))
             current_start = peak_indices[idx]
     line_ranges.append((current_start, peak_indices[-1]))
 
-    # Filter by height (typical text line height is 15-60px)
-    valid_lines = [r for r in line_ranges if 12 <= (r[1] - r[0]) <= 70]
-    
-    # If 2 lines detected (standard TD3 passport MRZ)
-    extracted_lines = []
+    valid_lines = [r for r in line_ranges if 8 <= (r[1] - r[0]) <= 50]
+    if len(valid_lines) < 2:
+        return []
 
     # Target number of characters in TD3 is 44
     num_chars = 44
+    extracted_lines = []
 
     for (ly1, ly2) in valid_lines[-2:]:  # Take the bottom-most 2 lines
-        pad_y = 2
-        line_crop = thresh[max(0, ly1 - pad_y) : min(mrz_h, ly2 + pad_y + 1), :]
+        line_crop = thresh[max(0, ly1 - 2) : min(mrz_h, ly2 + 3), :]
         line_w = line_crop.shape[1]
 
-        # Find left and right margins of the line
-        v_proj = np.sum(line_crop, axis=0)
+        v_proj = np.sum(line_crop > 0, axis=0)
         active_cols = np.where(v_proj > 0)[0]
 
         if active_cols.size == 0:
@@ -141,10 +138,9 @@ def extract_mrz_lines_from_image(image: np.ndarray) -> List[str]:
         lx1, lx2 = active_cols[0], active_cols[-1]
         active_w = lx2 - lx1
 
-        if active_w < (w * 0.5):
+        if active_w < (w * 0.3):
             continue
 
-        # Monospaced slot width
         slot_w = active_w / float(num_chars)
         line_str = []
 
