@@ -12,6 +12,7 @@ opencv-python-headless>=4.10.0
 pillow>=10.4.0
 matplotlib>=3.8.0
 pytesseract>=0.3.10
+pypdfium2>=4.30.0
 easyocr>=1.7.0
 scikit-image>=0.22.0
 shapely>=2.0.0

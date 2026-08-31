@@ -463,8 +463,23 @@ export async function uploadDocument(input: UploadDocumentInput): Promise<Upload
       processedSize:
         processedWidth && processedHeight ? { width: processedWidth, height: processedHeight } : undefined,
     };
-  } catch {
+  } catch (err) {
     const metrics = await measureImageFile(file);
+    const fallbackQuality: QualityReport = metrics
+      ? buildQualityReport(metrics)
+      : {
+          isAcceptable: false,
+          warnings: ['Document preprocessing failed: Unable to decode or verify document quality.'],
+          checks: [
+            { key: 'sharpness', label: 'Image Sharpness', verdict: 'POOR', detail: 'Could not render document page', hint: 'Re-upload a clear image or valid PDF document.' },
+            { key: 'glare', label: 'Glare & Reflections', verdict: 'ACCEPTABLE', detail: 'Unverified' },
+            { key: 'corners', label: 'Document Boundary', verdict: 'POOR', detail: 'Edges not found', hint: 'Ensure all 4 document corners are visible in the frame.' },
+            { key: 'perspective', label: 'Perspective Correction', verdict: 'POOR', detail: 'Transform failed', hint: 'Photograph the document flat and square.' },
+            { key: 'brightness', label: 'Exposure', verdict: 'ACCEPTABLE', detail: 'Unverified' },
+            { key: 'contrast', label: 'Contrast', verdict: 'POOR', detail: 'Below threshold', hint: 'Ensure adequate lighting.' },
+          ],
+        };
+
     return {
       documentId: `doc-${hashFile(file)}`,
       documentType,
@@ -473,19 +488,9 @@ export async function uploadDocument(input: UploadDocumentInput): Promise<Upload
       mimeType: file.type || 'application/octet-stream',
       imageUrl: originalDataUrl ?? '',
       originalImageUrl: originalDataUrl,
-      quality: buildQualityReport(
-        metrics ?? {
-          width: 1600,
-          height: 1100,
-          blurScore: 120,
-          glareRatio: 0.01,
-          meanBrightness: 140,
-          contrastScore: 55,
-          cornersDetected: true,
-        },
-      ),
-      cornersDetected: true,
-      detectionConfidence: 0.95,
+      quality: fallbackQuality,
+      cornersDetected: metrics ? metrics.cornersDetected : false,
+      detectionConfidence: metrics?.detectionConfidence ?? 0.0,
       processingTimeMs: 320,
       uploadedAt: new Date().toISOString(),
     };
