@@ -36,12 +36,12 @@ export function Header({ onToggleSidebar }: HeaderProps) {
   };
 
   return (
-    <header className="sticky top-0 z-30 border-b border-border bg-surface/90 backdrop-blur-md">
+    <header className="sticky top-0 z-30 border-b border-peach-200/80 bg-surface/80 backdrop-blur-2xl shadow-[0_8px_30px_-4px_rgba(245,123,74,0.08),0_2px_6px_-1px_rgba(0,0,0,0.03)]">
       <div className="flex h-16 items-center gap-3 px-4 lg:px-6">
         <button
           type="button"
           onClick={onToggleSidebar}
-          className="grid size-9 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground lg:hidden"
+          className="grid size-9 shrink-0 place-items-center rounded-xl text-muted-foreground transition-all hover:bg-peach-100/70 hover:text-foreground lg:hidden"
           aria-label="Toggle navigation"
         >
           <Menu className="size-4" aria-hidden />
@@ -52,7 +52,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
         <form onSubmit={onSearch} className="ml-auto hidden w-full max-w-xs md:block">
           <div className="relative">
             <Search
-              className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
+              className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-peach-600/70"
               aria-hidden
             />
             <input
@@ -60,7 +60,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Case ID, holder or document no."
               aria-label="Search cases"
-              className="h-9 w-full rounded-lg border border-input bg-surface-muted pl-9 pr-3 text-xs text-foreground placeholder:text-muted-foreground/60 focus:border-border-strong focus:outline-none focus:ring-1 focus:ring-ring"
+              className="h-9 w-full rounded-xl border border-peach-200/80 bg-surface/70 backdrop-blur-sm pl-9 pr-3 text-xs text-foreground placeholder:text-muted-foreground/70 shadow-xs focus:border-peach-400 focus:bg-surface focus:outline-none focus:ring-2 focus:ring-peach-400/30 transition-all"
             />
           </div>
         </form>
@@ -83,9 +83,9 @@ export function Header({ onToggleSidebar }: HeaderProps) {
         produces evidence and a risk indication; the decision stays with the
         officer, and the interface should never let that slip out of view.
       */}
-      <div className="flex items-center gap-2 border-t border-border/60 bg-surface-muted/40 px-4 py-1.5 lg:px-6">
-        <ShieldAlert className="size-3 shrink-0 text-muted-foreground" aria-hidden />
-        <p className="truncate font-mono text-2xs uppercase tracking-[0.14em] text-muted-foreground">
+      <div className="flex items-center gap-2 border-t border-peach-200/50 bg-gradient-to-r from-peach-50/90 via-peach-50/50 to-surface/80 px-4 py-1.5 lg:px-6 backdrop-blur-sm">
+        <ShieldAlert className="size-3 shrink-0 text-peach-600" aria-hidden />
+        <p className="truncate font-mono text-2xs uppercase tracking-[0.14em] text-peach-950/80 font-medium">
           Decision support — every result requires officer verification. No automated admission or refusal.
         </p>
       </div>
@@ -119,9 +119,9 @@ function ServiceStatus({
     // its own inline-flex root, which would otherwise stay in the layout.
     <div className={cn('hidden sm:block', className)}>
       <Tooltip content={config.detail} side="bottom">
-        <span className="flex items-center gap-2 rounded-lg border border-border bg-surface px-2.5 py-1.5">
+        <span className="flex items-center gap-2 rounded-xl border border-peach-200/80 bg-surface/70 backdrop-blur-md px-3 py-1.5 shadow-xs transition-all hover:bg-surface">
           <LiveDot tone={config.tone} />
-          <span className="text-2xs font-medium text-muted-foreground">{config.label}</span>
+          <span className="text-2xs font-semibold text-foreground/80">{config.label}</span>
         </span>
       </Tooltip>
     </div>

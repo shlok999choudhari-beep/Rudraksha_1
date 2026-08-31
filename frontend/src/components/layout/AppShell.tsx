@@ -48,8 +48,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className="flex min-h-screen bg-background">
-      <div className="hidden lg:flex">
+    <div className="relative flex min-h-screen bg-background overflow-x-hidden selection:bg-peach-500 selection:text-white">
+      {/* Dynamic Ambient Peach & Alabaster Light Orbs (Frosted diffusion) */}
+      <div className="pointer-events-none fixed -top-32 right-10 size-[32rem] rounded-full bg-gradient-to-br from-peach-300/20 to-peach-400/10 blur-3xl" aria-hidden />
+      <div className="pointer-events-none fixed top-1/2 -left-20 size-[28rem] rounded-full bg-gradient-to-tr from-peach-200/25 to-amber-200/15 blur-3xl" aria-hidden />
+      <div className="pointer-events-none fixed bottom-10 right-1/4 size-[24rem] rounded-full bg-gradient-to-t from-peach-300/15 to-rose-200/10 blur-3xl" aria-hidden />
+
+      <div className="hidden lg:flex relative z-20">
         <Sidebar collapsed={collapsed} onToggle={toggleCollapsed} />
       </div>
 
@@ -58,24 +63,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <button
             type="button"
             onClick={() => setDrawerOpen(false)}
-            className="absolute inset-0 animate-fade-in bg-background/80 backdrop-blur-sm"
+            className="absolute inset-0 animate-fade-in bg-foreground/20 backdrop-blur-md"
             aria-label="Close navigation"
           />
-          <div className="relative animate-fade-in">
+          <div className="relative animate-fade-in z-10">
             <Sidebar collapsed={false} onToggle={() => setDrawerOpen(false)} />
           </div>
         </div>
       )}
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="relative flex min-w-0 flex-1 flex-col z-10">
         <Header onToggleSidebar={() => setDrawerOpen(true)} />
-        {/* Faint top-lit wash so content sits in a console, not on a flat page. */}
+        {/* Soft radial aura wash for content */}
         <main className="relative min-w-0 flex-1">
           <div
-            className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-radial-fade opacity-70"
+            className="pointer-events-none absolute inset-x-0 top-0 h-96 bg-radial-fade opacity-80"
             aria-hidden
           />
-          <div className="relative">{children}</div>
+          <div className="relative z-10">{children}</div>
         </main>
       </div>
     </div>

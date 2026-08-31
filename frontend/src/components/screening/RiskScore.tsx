@@ -60,18 +60,20 @@ export function RiskScore({ assessment, className }: RiskScoreProps) {
   return (
     <div
       className={cn(
-        'relative overflow-hidden rounded-2xl border bg-gradient-to-r p-6 shadow-sm transition-all',
+        'relative overflow-hidden rounded-2xl border bg-surface/85 backdrop-blur-2xl p-6 shadow-[0_8px_32px_-4px_rgba(245,123,74,0.12),0_2px_8px_0_rgba(0,0,0,0.02)] transition-all',
         style.border,
-        style.bg,
         className
       )}
     >
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+      {/* Background ambient tinted wash */}
+      <div className={cn('pointer-events-none absolute inset-0 bg-gradient-to-r opacity-25', style.bg)} />
+
+      <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
         {/* Left Side: Score & Verdict */}
         <div className="flex items-start gap-4">
           <div
             className={cn(
-              'grid size-20 place-items-center rounded-2xl border bg-surface/90 shadow-inner shrink-0',
+              'grid size-20 place-items-center rounded-2xl border bg-surface/95 backdrop-blur shadow-[0_4px_16px_-2px_rgba(0,0,0,0.06)] shrink-0',
               style.border
             )}
           >
@@ -79,7 +81,7 @@ export function RiskScore({ assessment, className }: RiskScoreProps) {
               <span className={cn('font-mono text-3xl font-black tabular leading-none', style.text)}>
                 {score}
               </span>
-              <span className="block font-mono text-[9px] uppercase tracking-wider text-muted-foreground mt-1">
+              <span className="block font-mono text-[9px] uppercase tracking-wider text-muted-foreground mt-1 font-semibold">
                 Score / 100
               </span>
             </div>
@@ -89,7 +91,7 @@ export function RiskScore({ assessment, className }: RiskScoreProps) {
             <div className="flex flex-wrap items-center gap-2">
               <span
                 className={cn(
-                  'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider font-mono border',
+                  'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider font-mono border shadow-2xs',
                   style.badge
                 )}
               >
@@ -98,7 +100,7 @@ export function RiskScore({ assessment, className }: RiskScoreProps) {
               </span>
 
               {partial && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 border border-amber-500/30 px-2.5 py-0.5 text-2xs font-mono font-semibold text-amber-400">
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 border border-amber-500/30 px-2.5 py-0.5 text-2xs font-mono font-semibold text-amber-500">
                   <AlertCircle className="size-3" />
                   Partial Analysis
                 </span>
@@ -108,33 +110,33 @@ export function RiskScore({ assessment, className }: RiskScoreProps) {
             <h2 className="text-lg font-bold text-foreground">
               {recommendedAction}
             </h2>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground font-medium">
               {RISK_LEVEL_SUBTITLE[level]}
             </p>
           </div>
         </div>
 
         {/* Right Side: Risk Threshold Gauge & Baseline */}
-        <div className="md:w-72 space-y-3 bg-surface/60 backdrop-blur rounded-xl p-3.5 border border-border">
+        <div className="md:w-72 space-y-3 bg-surface/80 backdrop-blur-md rounded-2xl p-4 border border-peach-200/80 shadow-xs">
           <div className="flex justify-between text-2xs font-mono text-muted-foreground">
             <span>Prototype Thresholds</span>
-            <span>Current: <strong>{score}</strong></span>
+            <span>Current: <strong className="text-foreground">{score}</strong></span>
           </div>
 
           {/* 3-segment Visual Meter */}
-          <div className="relative h-3 rounded-full bg-surface-muted overflow-hidden flex border border-border">
-            <div className="w-[30%] bg-emerald-500/40 border-r border-background" title="LOW (0-29)" />
-            <div className="w-[30%] bg-amber-500/40 border-r border-background" title="MEDIUM (30-59)" />
-            <div className="w-[40%] bg-rose-500/40" title="HIGH (60-100)" />
+          <div className="relative h-3 rounded-full bg-surface-muted overflow-hidden flex border border-peach-200/80 shadow-inner">
+            <div className="w-[30%] bg-emerald-500/50 border-r border-surface" title="LOW (0-29)" />
+            <div className="w-[30%] bg-amber-500/50 border-r border-surface" title="MEDIUM (30-59)" />
+            <div className="w-[40%] bg-rose-500/50" title="HIGH (60-100)" />
 
             {/* Score Marker Pin */}
             <div
-              className="absolute top-0 bottom-0 w-1.5 bg-white shadow-md transition-all duration-500"
-              style={{ left: `calc(${Math.min(100, Math.max(0, score))}% - 3px)` }}
+              className="absolute top-0 bottom-0 w-2 bg-foreground shadow-md rounded-full transition-all duration-500 ring-2 ring-white"
+              style={{ left: `calc(${Math.min(100, Math.max(0, score))}% - 4px)` }}
             />
           </div>
 
-          <div className="flex justify-between text-[10px] font-mono text-muted-foreground">
+          <div className="flex justify-between text-[10px] font-mono font-semibold">
             <span className="text-risk-low">LOW 0–29</span>
             <span className="text-risk-medium">MED 30–59</span>
             <span className="text-risk-high">HIGH 60+</span>

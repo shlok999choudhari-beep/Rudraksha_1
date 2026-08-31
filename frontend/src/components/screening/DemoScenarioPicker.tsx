@@ -83,7 +83,7 @@ export function DemoScenarioPicker({
         </span>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {DEMO_SCENARIOS.map((scenario) => {
           const isSelected = selectedScenario === scenario;
           const label = DEMO_SCENARIO_LABELS[scenario];
@@ -98,16 +98,16 @@ export function DemoScenarioPicker({
               disabled={disabled}
               onClick={() => onSelectScenario(scenario)}
               className={cn(
-                'flex items-start gap-3 p-3 rounded-xl border text-left transition-all',
+                'flex items-start gap-3 p-3.5 rounded-2xl border text-left transition-all duration-200',
                 isSelected
-                  ? 'border-foreground/80 bg-surface-raised shadow-sm ring-1 ring-border-strong'
-                  : 'border-border bg-surface-muted/30 hover:border-border-strong hover:bg-surface-muted/70',
+                  ? 'border-peach-400 bg-gradient-to-br from-peach-50/95 via-peach-50/60 to-surface shadow-[0_4px_16px_-2px_rgba(245,123,74,0.18)] ring-1 ring-peach-400/60 scale-[1.01]'
+                  : 'border-peach-200/70 bg-surface/70 backdrop-blur-sm hover:border-peach-300 hover:bg-peach-50/30 hover:-translate-y-0.5 hover:shadow-sm',
                 disabled && 'opacity-60 cursor-not-allowed'
               )}
             >
               <span
                 className={cn(
-                  'grid size-8 place-items-center rounded-lg border shrink-0',
+                  'grid size-8.5 place-items-center rounded-xl border shrink-0 shadow-2xs',
                   cfg.tone
                 )}
               >
@@ -116,11 +116,11 @@ export function DemoScenarioPicker({
 
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-1">
-                  <span className="font-semibold text-xs text-foreground truncate">
+                  <span className={cn('text-xs truncate', isSelected ? 'font-bold text-peach-950' : 'font-semibold text-foreground')}>
                     {label}
                   </span>
                 </div>
-                <span className="font-mono text-[10px] text-muted-foreground block mt-0.5">
+                <span className={cn('font-mono text-[10px] block mt-0.5', isSelected ? 'text-peach-800 font-medium' : 'text-muted-foreground')}>
                   {cfg.risk}
                 </span>
                 <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2 leading-relaxed">
