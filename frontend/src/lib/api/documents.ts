@@ -71,8 +71,8 @@ interface PreprocessResponse {
   quality: BackendQualityReport;
   corners_detected: boolean;
   detection_confidence: number | null;
-  original_size: [number, number] | null;
-  processed_size: [number, number] | null;
+  original_size: [number, number] | { width: number; height: number } | null;
+  processed_size: [number, number] | { width: number; height: number } | null;
   processing_time_ms: number | null;
   image_url: string | null;
   base64_image: string | null;
@@ -429,7 +429,15 @@ export async function uploadDocument(input: UploadDocumentInput): Promise<Upload
   });
 
   const detectionConfidence = response.detection_confidence ?? undefined;
-  const [processedWidth, processedHeight] = response.processed_size ?? [0, 0];
+  
+  let processedWidth = 0;
+  let processedHeight = 0;
+  if (Array.isArray(response.processed_size)) {
+    [processedWidth, processedHeight] = response.processed_size;
+  } else if (response.processed_size && typeof response.processed_size === 'object') {
+    processedWidth = (response.processed_size as { width?: number }).width ?? 0;
+    processedHeight = (response.processed_size as { height?: number }).height ?? 0;
+  }
 
   return {
     documentId: response.document_id,

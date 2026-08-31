@@ -250,14 +250,19 @@ async def preprocess_document_endpoint(
         _, buffer = cv2.imencode(".jpg", result.processed_image)
         b64_image = base64.b64encode(buffer).decode("utf-8")
 
+        orig_w = result.original_size.get("width", 0) if isinstance(result.original_size, dict) else (result.original_size[0] if result.original_size else 0)
+        orig_h = result.original_size.get("height", 0) if isinstance(result.original_size, dict) else (result.original_size[1] if result.original_size else 0)
+        proc_w = result.processed_size.get("width", 0) if isinstance(result.processed_size, dict) else (result.processed_size[0] if result.processed_size else 0)
+        proc_h = result.processed_size.get("height", 0) if isinstance(result.processed_size, dict) else (result.processed_size[1] if result.processed_size else 0)
+
         return {
             "document_id": doc_id,
             "success": True,
             "quality": result.quality_report.to_dict(),
             "corners_detected": result.corners_detected,
             "detection_confidence": result.detection_confidence,
-            "original_size": result.original_size,
-            "processed_size": result.processed_size,
+            "original_size": [orig_w, orig_h],
+            "processed_size": [proc_w, proc_h],
             "processing_time_ms": result.processing_time_ms,
             "image_url": f"/static/processed/{processed_filename}",
             "base64_image": f"data:image/jpeg;base64,{b64_image}"

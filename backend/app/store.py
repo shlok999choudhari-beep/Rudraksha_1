@@ -124,9 +124,12 @@ def save_case_to_db(case_dict: Dict[str, Any]):
             liveness = case_dict.get("liveness", {})
 
             if not existing:
+                clean_suffix = case_id.replace("case-", "").replace("-", "").upper()
+                if not clean_suffix:
+                    clean_suffix = uuid.uuid4().hex[:6].upper()
                 new_case = ScreeningCase(
                     id=case_id,
-                    case_number=f"VG-{datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%d')}-{case_id[:6].upper()}",
+                    case_number=f"VG-{datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%d')}-{clean_suffix[:6]}",
                     status=case_dict.get("status", "COMPLETED"),
                     document_type=doc.get("type", "PASSPORT"),
                     document_number=doc.get("document_number", "N/A"),
