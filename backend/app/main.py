@@ -884,24 +884,24 @@ def run_screening_endpoint(payload: RunScreeningRequest):
         viz = report.ocr_layout_report.viz_data if report.ocr_layout_report else None
         mrz_p = report.mrz_parsed_result
 
-        doc_num = viz.document_number if (viz and viz.document_number != "NOT_DETECTED") else (mrz_p.document_number if mrz_p else "A12345678")
-        surname = viz.surname if (viz and viz.surname != "NOT_DETECTED") else (mrz_p.surname if mrz_p else "DOE")
-        given_names = viz.given_names if (viz and viz.given_names != "NOT_DETECTED") else (mrz_p.given_names if mrz_p else "JANE")
-        holder_name = f"{given_names} {surname}".strip()
-        dob = viz.date_of_birth if (viz and viz.date_of_birth != "NOT_DETECTED") else (str(mrz_p.date_of_birth) if (mrz_p and mrz_p.date_of_birth) else "1985-07-12")
-        expiry = viz.date_of_expiry if (viz and viz.date_of_expiry != "NOT_DETECTED") else (str(mrz_p.date_of_expiry) if (mrz_p and mrz_p.date_of_expiry) else "2030-01-01")
-        nationality = viz.nationality if (viz and viz.nationality != "NOT_DETECTED") else (mrz_p.nationality if mrz_p else "UTO")
-        sex = viz.sex if (viz and viz.sex != "NOT_DETECTED") else (mrz_p.sex if mrz_p else "F")
+        doc_num = viz.document_number if (viz and viz.document_number and viz.document_number != "NOT_DETECTED") else (mrz_p.document_number if mrz_p else "")
+        surname = viz.surname if (viz and viz.surname and viz.surname != "NOT_DETECTED") else (mrz_p.surname if mrz_p else "")
+        given_names = viz.given_names if (viz and viz.given_names and viz.given_names != "NOT_DETECTED") else (mrz_p.given_names if mrz_p else "")
+        holder_name = f"{given_names} {surname}".strip() if (given_names or surname) else (mrz_p.full_name if mrz_p else "UNKNOWN")
+        dob = viz.date_of_birth if (viz and viz.date_of_birth and viz.date_of_birth != "NOT_DETECTED") else (str(mrz_p.date_of_birth) if (mrz_p and mrz_p.date_of_birth) else "")
+        expiry = viz.date_of_expiry if (viz and viz.date_of_expiry and viz.date_of_expiry != "NOT_DETECTED") else (str(mrz_p.date_of_expiry) if (mrz_p and mrz_p.date_of_expiry) else "")
+        nationality = viz.nationality if (viz and viz.nationality and viz.nationality != "NOT_DETECTED") else (mrz_p.nationality if mrz_p else "")
+        sex = viz.sex if (viz and viz.sex and viz.sex != "NOT_DETECTED") else (mrz_p.sex if mrz_p else "")
 
         doc_fields = [
-            {"name": "Document Number", "value": doc_num, "confidence": 0.99},
-            {"name": "Surname", "value": surname, "confidence": 0.98},
-            {"name": "Given Names", "value": given_names, "confidence": 0.98},
-            {"name": "Holder Name", "value": holder_name, "confidence": 0.98},
-            {"name": "Date of Birth", "value": dob, "confidence": 0.98},
-            {"name": "Date of Expiry", "value": expiry, "confidence": 0.98},
-            {"name": "Nationality", "value": nationality, "confidence": 0.99},
-            {"name": "Sex", "value": sex, "confidence": 0.99},
+            {"key": "document_number", "label": "Document Number", "value": doc_num, "confidence": 0.99},
+            {"key": "surname", "label": "Surname", "value": surname, "confidence": 0.98},
+            {"key": "given_names", "label": "Given Names", "value": given_names, "confidence": 0.98},
+            {"key": "holder_name", "label": "Holder Name", "value": holder_name, "confidence": 0.98},
+            {"key": "date_of_birth", "label": "Date of Birth", "value": dob, "confidence": 0.98},
+            {"key": "date_of_expiry", "label": "Date of Expiry", "value": expiry, "confidence": 0.98},
+            {"key": "nationality", "label": "Nationality", "value": nationality, "confidence": 0.99},
+            {"key": "sex", "label": "Sex", "value": sex, "confidence": 0.99},
         ]
 
         # Construct full case payload matching TypeScript ScreeningResult
@@ -948,7 +948,13 @@ def run_screening_endpoint(payload: RunScreeningRequest):
                 "format": report.mrz_parsed_result.document_format if report.mrz_parsed_result else "TD3",
                 "lines": report.mrz_parsed_result.raw_lines if report.mrz_parsed_result else [],
                 "fields": [
-                    {"name": "Document Number", "value": doc_num, "confidence": 1.0},
+                    {"key": "document_number", "label": "Document Number", "value": doc_num, "confidence": 1.0},
+                    {"key": "surname", "label": "Surname", "value": surname, "confidence": 1.0},
+                    {"key": "given_names", "label": "Given Names", "value": given_names, "confidence": 1.0},
+                    {"key": "date_of_birth", "label": "Date of Birth", "value": dob, "confidence": 1.0},
+                    {"key": "date_of_expiry", "label": "Date of Expiry", "value": expiry, "confidence": 1.0},
+                    {"key": "nationality", "label": "Nationality", "value": nationality, "confidence": 1.0},
+                    {"key": "sex", "label": "Sex", "value": sex, "confidence": 1.0},
                 ],
                 "check_digits": check_digits,
                 "message": None if (report.mrz_parsed_result and report.mrz_parsed_result.is_valid) else "MRZ checksum discrepancy detected",

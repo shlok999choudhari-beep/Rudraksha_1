@@ -65,8 +65,8 @@ export function OCRResults({ ocr, className }: OCRResultsProps) {
 
               return (
                 <tr key={field.key || field.label || `ocr-field-${idx}`} className="hover:bg-surface-muted/30">
-                  <td className="py-2.5 px-4 font-mono text-2xs text-muted-foreground">
-                    {field.label}
+                  <td className="py-2.5 px-4 font-mono text-2xs font-medium text-foreground/80">
+                    {field.label || (field as any).name || (field.key ? field.key.replace(/_/g, ' ').toUpperCase() : `Field ${idx + 1}`)}
                   </td>
                   <td className="py-2.5 px-4 font-medium text-foreground font-mono">
                     {field.value || '—'}

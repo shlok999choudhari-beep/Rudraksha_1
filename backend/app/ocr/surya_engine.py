@@ -176,44 +176,106 @@ class SuryaOCREngine:
         mrz_parsed: Optional[MRZParsedResult]
     ) -> VIZDataPayload:
         """
-        Synthesizes structured VIZ fields by parsing recognized text patterns,
+        Synthesizes structured VIZ fields by parsing recognized 2D text layout patterns,
         with fallback to parsed MRZ values.
         """
-        passport_no = mrz_parsed.document_number if mrz_parsed else "P12345678"
-        surname = mrz_parsed.surname if mrz_parsed else "SHARMA"
-        given_names = mrz_parsed.given_names if mrz_parsed else "AARAV"
-        dob = str(mrz_parsed.date_of_birth) if (mrz_parsed and mrz_parsed.date_of_birth) else "1994-08-15"
-        expiry = str(mrz_parsed.date_of_expiry) if (mrz_parsed and mrz_parsed.date_of_expiry) else "2034-08-14"
-        nationality = mrz_parsed.nationality if mrz_parsed else "IND"
-        sex = mrz_parsed.sex if mrz_parsed else "M"
+        # Baseline fallback from MRZ if available, otherwise empty string
+        passport_no = mrz_parsed.document_number if mrz_parsed else ""
+        surname = mrz_parsed.surname if mrz_parsed else ""
+        given_names = mrz_parsed.given_names if mrz_parsed else ""
+        dob = str(mrz_parsed.date_of_birth) if (mrz_parsed and mrz_parsed.date_of_birth) else ""
+        expiry = str(mrz_parsed.date_of_expiry) if (mrz_parsed and mrz_parsed.date_of_expiry) else ""
+        nationality = mrz_parsed.nationality if mrz_parsed else ""
+        sex = mrz_parsed.sex if mrz_parsed else ""
 
-        # Regex scan over raw text lines for specific labels
+        # Map of visual labels to search for
+        label_keywords_map = {
+            'doc_num': ['Passport No', 'Passeport No', 'Doc No', 'Document No', 'Passport Number'],
+            'surname': ['Surname', 'Nom'],
+            'given_names': ['Given Names', 'Prenoms', 'Given Name'],
+            'nationality': ['Nationality', 'Nationalite'],
+            'dob': ['Date of Birth', 'Date de Naissance', 'Birth'],
+            'sex': ['Sex', 'Sexe'],
+            'expiry': ['Date of Expiry', 'Date dExpiration', 'Expiry', 'Expiration'],
+        }
+
+        # Spatial layout matching for multi-column documents
+        boxes = []
         for line in text_lines:
-            t = line.text.upper()
-            
-            # Passport / Document No pattern (e.g. Passport No: X99999999 or A12345678)
-            doc_m = re.search(r'(?:PASSPORT|DOC|NO|NUMBER)\s*[:.\s]?\s*([A-Z0-9]{7,9})', t)
-            if doc_m:
-                passport_no = doc_m.group(1)
+            bx = line.bbox.get('x', 0)
+            by = line.bbox.get('y', 0)
+            bw = line.bbox.get('w', 0)
+            bh = line.bbox.get('h', 0)
+            boxes.append({
+                'text': line.text.strip(),
+                'bx': bx,
+                'by': by,
+                'bw': bw,
+                'bh': bh,
+                'conf': line.confidence
+            })
 
-            # Surname pattern
-            sur_m = re.search(r'(?:SURNAME|NOM)\s*[:.\s]?\s*([A-Z]{2,20})', t)
-            if sur_m:
-                surname = sur_m.group(1)
+        for field_key, keywords in label_keywords_map.items():
+            best_lbl = None
+            for b in boxes:
+                # Exclude MRZ region at bottom (y > 600 in normalized scale)
+                if b['by'] > 600:
+                    continue
+                for kw in keywords:
+                    if kw.upper() in b['text'].upper():
+                        best_lbl = b
+                        break
+                if best_lbl:
+                    break
 
-            # Given Names pattern
-            giv_m = re.search(r'(?:GIVEN\s*NAMES?|PRENOMS?)\s*[:.\s]?\s*([A-Z\s]{2,30})', t)
-            if giv_m:
-                given_names = giv_m.group(1).strip()
+            if best_lbl:
+                val_candidates = []
+                for b in boxes:
+                    if b == best_lbl or b['by'] > 600:
+                        continue
+                    # Check if box is another label
+                    is_other_lbl = any(
+                        kw.upper() in b['text'].upper()
+                        for kws in label_keywords_map.values()
+                        for kw in kws
+                    )
+                    if is_other_lbl:
+                        continue
 
-            # Date patterns (DD/MM/YYYY or DD MMM YYYY)
-            dates = re.findall(r'(\d{2}[/-]\d{2}[/-]\d{4}|\d{2}\s+[A-Z]{3}\s+\d{4})', t)
-            if "BIRTH" in t or "DOB" in t or "NAISSANCE" in t:
-                if dates:
-                    dob = dates[0]
-            if "EXPIRY" in t or "EXP" in t or "EXPIRATION" in t:
-                if dates:
-                    expiry = dates[0]
+                    dy = b['by'] - (best_lbl['by'] + best_lbl['bh'])
+                    dx = abs(b['bx'] - best_lbl['bx'])
+                    if -5 <= dy <= 45 and dx <= 70:
+                        val_candidates.append((dy, dx, b))
+
+                if val_candidates:
+                    val_candidates.sort(key=lambda item: item[0] + item[1] * 0.2)
+                    matched_val = val_candidates[0][2]['text'].strip()
+
+                    if field_key == 'doc_num' and matched_val:
+                        passport_no = matched_val
+                    elif field_key == 'surname' and matched_val:
+                        surname = matched_val
+                    elif field_key == 'given_names' and matched_val:
+                        given_names = matched_val
+                    elif field_key == 'nationality' and matched_val:
+                        nationality = matched_val
+                    elif field_key == 'dob' and matched_val:
+                        dob = matched_val
+                    elif field_key == 'sex' and matched_val:
+                        cleaned_sex = matched_val.upper().strip()
+                        if cleaned_sex in ('M', 'F', 'X', 'MALE', 'FEMALE'):
+                            sex = 'M' if cleaned_sex.startswith('M') else ('F' if cleaned_sex.startswith('F') else 'X')
+                        elif mrz_parsed and mrz_parsed.sex:
+                            sex = mrz_parsed.sex
+                    elif field_key == 'expiry' and matched_val:
+                        expiry = matched_val
+
+        # Fallback document number regex scan if still empty
+        if not passport_no:
+            for b in boxes:
+                if re.match(r'^[A-Z][0-9]{7,8}$', b['text']):
+                    passport_no = b['text']
+                    break
 
         return VIZDataPayload(
             document_number=passport_no,
