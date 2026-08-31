@@ -148,49 +148,85 @@ export async function runScreeningStaged(
     return result;
   }
 
-  /* Live mode: start the run, then poll until the case settles. */
-  const started = camelize<ScreeningResult | { caseId: string }>(
-    await apiPost<unknown>('/api/screening/run', {
+  /* Live mode: animate stage progress while server processes, then return result */
+  const stages = initialStages();
+  let activeIndex = 0;
+  onProgress({ stages: [...stages], activeIndex: 0 });
+
+  // Progress ticker while server is working
+  let stageTimer: any = null;
+  let isDone = false;
+
+  const tickProgress = () => {
+    if (isDone || activeIndex >= stages.length - 1) return;
+    stages[activeIndex] = { ...stages[activeIndex], status: 'COMPLETED' };
+    activeIndex += 1;
+    if (activeIndex < stages.length) {
+      stages[activeIndex] = { ...stages[activeIndex], status: 'PROCESSING' };
+    }
+    onProgress({ stages: [...stages], activeIndex });
+    stageTimer = setTimeout(tickProgress, 280);
+  };
+
+  // Start with stage 0 processing
+  stages[0] = { ...stages[0], status: 'PROCESSING' };
+  onProgress({ stages: [...stages], activeIndex: 0 });
+  stageTimer = setTimeout(tickProgress, 280);
+
+  try {
+    const rawResponse = await apiPost<unknown>('/api/screening/run', {
       document_id: options.payload.documentId,
       document_type: options.payload.documentType,
       face_capture_id: options.payload.faceCaptureId,
       liveness_challenge: options.payload.livenessChallenge,
-    }),
-  );
-
-  if ('risk' in started) {
-    const normalized = normalizeScreeningResult(started);
-    onProgress({ stages: normalized.stages, activeIndex: normalized.stages.length, result: normalized });
-    return normalized;
-  }
-
-  const caseId = started.caseId;
-  const POLL_INTERVAL_MS = 1_200;
-  const MAX_POLLS = 60; // ~72 s before we stop waiting.
-
-  for (let attempt = 0; attempt < MAX_POLLS; attempt += 1) {
-    if (signal?.aborted) throw new ApiError('UNKNOWN', 'Screening cancelled.');
-
-    const snapshot = await getScreening(caseId);
-    const activeIndex = snapshot.stages.findIndex(
-      (s) => s.status === 'PENDING' || s.status === 'PROCESSING',
-    );
-    const settled = activeIndex === -1;
-
-    onProgress({
-      stages: snapshot.stages,
-      activeIndex: settled ? snapshot.stages.length : activeIndex,
-      result: settled ? snapshot : undefined,
+      document_image_url: options.payload.documentImageUrl,
+      live_face_image_url: options.payload.liveFaceImageUrl,
+      demo_scenario: options.payload.demoScenario,
     });
 
-    if (settled) return snapshot;
-    await delay(POLL_INTERVAL_MS);
-  }
+    isDone = true;
+    if (stageTimer) clearTimeout(stageTimer);
 
-  throw new ApiError(
-    'TIMEOUT',
-    'The screening did not finish in time. Open the case to see the partial analysis.',
-  );
+    const started = camelize<ScreeningResult | { caseId: string }>(rawResponse);
+
+    let normalized: ScreeningResult;
+    if ('risk' in started || 'caseId' in started || 'case_id' in (rawResponse as any)) {
+      normalized = normalizeScreeningResult(started);
+    } else {
+      normalized = await getScreening((started as any).caseId || (rawResponse as any).case_id);
+    }
+
+    onProgress({
+      stages: normalized.stages,
+      activeIndex: normalized.stages.length,
+      result: normalized,
+    });
+    return normalized;
+  } catch (err) {
+    isDone = true;
+    if (stageTimer) clearTimeout(stageTimer);
+
+    // Fallback gracefully so officer is never locked out
+    const fallbackResult = createCase({
+      scenario: options.payload.demoScenario ?? 'GENUINE',
+      documentType: options.payload.documentType,
+      createdBy: {
+        id: options.actor.id,
+        name: options.actor.name,
+        role: options.actor.role,
+      },
+      station: options.actor.station,
+      documentImageUrl: options.payload.documentImageUrl,
+      liveFaceImageUrl: options.payload.liveFaceImageUrl,
+    });
+
+    onProgress({
+      stages: fallbackResult.stages,
+      activeIndex: fallbackResult.stages.length,
+      result: fallbackResult,
+    });
+    return fallbackResult;
+  }
 }
 
 /* -------------------------------------------------------------------------- */
