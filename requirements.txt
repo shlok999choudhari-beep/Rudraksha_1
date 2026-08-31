@@ -8,10 +8,12 @@ python-multipart>=0.0.9
 
 
 # Computer Vision, OCR & Forensics
-opencv-python>=4.10.0
+opencv-python-headless>=4.10.0
 pillow>=10.4.0
 matplotlib>=3.8.0
-surya-ocr>=0.22.0
+easyocr>=1.7.0
+scikit-image>=0.22.0
+shapely>=2.0.0
 torch>=2.2.0
 torchvision>=0.17.0
 
