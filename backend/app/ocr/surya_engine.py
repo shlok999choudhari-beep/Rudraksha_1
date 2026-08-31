@@ -49,13 +49,9 @@ class SuryaOCREngine:
                 import torch
                 import easyocr
                 torch.set_num_threads(2)
-                self._easyocr_reader = easyocr.Reader(['en'], gpu=self.use_gpu, verbose=False, quantize=True)
+                self._easyocr_reader = easyocr.Reader(['en'], gpu=self.use_gpu, verbose=False, quantize=False)
             except Exception:
-                try:
-                    import easyocr
-                    self._easyocr_reader = easyocr.Reader(['en'], gpu=self.use_gpu, verbose=False)
-                except Exception:
-                    self._easyocr_reader = False
+                self._easyocr_reader = False
         return self._easyocr_reader if self._easyocr_reader is not False else None
 
     def _try_load_surya(self):
