@@ -471,9 +471,9 @@ export async function uploadDocument(input: UploadDocumentInput): Promise<Upload
           isAcceptable: false,
           warnings: ['Document preprocessing failed: Unable to decode or verify document quality.'],
           checks: [
-            { key: 'sharpness', label: 'Image Sharpness', verdict: 'POOR', detail: 'Could not render document page', hint: 'Re-upload a clear image or valid PDF document.' },
+            { key: 'blur', label: 'Image Sharpness', verdict: 'POOR', detail: 'Could not render document page', hint: 'Re-upload a clear image or valid PDF document.' },
             { key: 'glare', label: 'Glare & Reflections', verdict: 'ACCEPTABLE', detail: 'Unverified' },
-            { key: 'corners', label: 'Document Boundary', verdict: 'POOR', detail: 'Edges not found', hint: 'Ensure all 4 document corners are visible in the frame.' },
+            { key: 'document_visibility', label: 'Document Boundary', verdict: 'POOR', detail: 'Edges not found', hint: 'Ensure all 4 document corners are visible in the frame.' },
             { key: 'perspective', label: 'Perspective Correction', verdict: 'POOR', detail: 'Transform failed', hint: 'Photograph the document flat and square.' },
             { key: 'brightness', label: 'Exposure', verdict: 'ACCEPTABLE', detail: 'Unverified' },
             { key: 'contrast', label: 'Contrast', verdict: 'POOR', detail: 'Below threshold', hint: 'Ensure adequate lighting.' },
