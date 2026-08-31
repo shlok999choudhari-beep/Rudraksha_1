@@ -83,6 +83,10 @@ class ScreeningCase(Base):
     review_decision = Column(String(64), nullable=True)
     review_notes = Column(Text, nullable=True)
     document_image_b64 = Column(Text, nullable=True)
+    document_image_url = Column(Text, nullable=True)
+    doc_face_url = Column(Text, nullable=True)
+    live_face_url = Column(Text, nullable=True)
+    ela_heatmap_url = Column(Text, nullable=True)
     
     created_at = Column(DateTime, default=datetime.datetime.utcnow, index=True)
     completed_at = Column(DateTime, nullable=True)

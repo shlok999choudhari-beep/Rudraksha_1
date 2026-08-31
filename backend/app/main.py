@@ -71,6 +71,10 @@ from backend.app.store import (
     record_audit_log,
     seed_initial_records,
 )
+from backend.app.db.supabase_client import (
+    upload_image_to_supabase,
+    is_supabase_enabled,
+)
 
 # Initialize FastAPI application
 app = FastAPI(
@@ -819,6 +823,19 @@ def run_screening_endpoint(payload: RunScreeningRequest):
         doc_id = payload.document_id or f"doc-{uuid.uuid4().hex[:8]}"
 
         doc_b64 = report.normalized_document_base64 or ""
+        doc_img_url = None
+        live_face_url = None
+
+        if is_supabase_enabled():
+            if doc_img is not None:
+                doc_img_url = upload_image_to_supabase(
+                    doc_img, bucket_name="veriguard-documents", filename=f"{case_id}_doc.jpg"
+                )
+            if live_img is not None:
+                live_face_url = upload_image_to_supabase(
+                    live_img, bucket_name="veriguard-faces", filename=f"{case_id}_live.jpg"
+                )
+
         doc_num = report.mrz_parsed_result.document_number if report.mrz_parsed_result else "A12345678"
         holder_name = f"{report.mrz_parsed_result.given_names} {report.mrz_parsed_result.surname}".strip() if report.mrz_parsed_result else "SPECIMEN JANE DOE"
 
@@ -915,7 +932,7 @@ def run_screening_endpoint(payload: RunScreeningRequest):
             "document": {
                 "document_id": doc_id,
                 "type": payload.document_type or "PASSPORT",
-                "image_url": doc_b64,
+                "image_url": doc_img_url or doc_b64,
                 "document_number": doc_num,
                 "holder_name": holder_name,
                 "fields": doc_fields,
