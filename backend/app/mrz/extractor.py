@@ -183,30 +183,18 @@ def extract_and_parse_mrz_from_image(
             except Exception:
                 pass
 
-        # 3. Try PyTesseract on multiple image variants
+        # 3. Fast Single-Pass PyTesseract MRZ Extraction (< 300ms)
         if not lines:
             try:
                 import pytesseract
-                # Pass clean crop directly
-                for psm in [6, 11, 4, 3]:
-                    cfg = f'--psm {psm}'
-                    raw_txt = pytesseract.image_to_string(mrz_crop, config=cfg)
-                    lines = clean_ocr_mrz_text(raw_txt)
-                    if len(lines) >= 2:
-                        break
-                
-                # Try lower 25% if crop missed
-                if len(lines) < 2:
-                    lower_band = image[int(h * 0.70):, :]
-                    for psm in [6, 11, 3]:
-                        raw_txt = pytesseract.image_to_string(lower_band, config=f'--psm {psm}')
-                        lines = clean_ocr_mrz_text(raw_txt)
-                        if len(lines) >= 2:
-                            break
+                # Pass 1: MRZ Crop (fastest)
+                raw_txt = pytesseract.image_to_string(mrz_crop, config='--psm 6')
+                lines = clean_ocr_mrz_text(raw_txt)
 
-                # Try full normalized image
+                # Pass 2: Lower 25% band if crop missed
                 if len(lines) < 2:
-                    raw_txt = pytesseract.image_to_string(image, config='--psm 6')
+                    lower_band = image[int(h * 0.72):, :]
+                    raw_txt = pytesseract.image_to_string(lower_band, config='--psm 6')
                     lines = clean_ocr_mrz_text(raw_txt)
             except Exception:
                 pass
