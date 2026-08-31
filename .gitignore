@@ -15,8 +15,9 @@ env/
 
 # Environment Variables
 .env
-.env.local
-*.env
+.env.*
+*.env*
+!*.env.example
 
 # IDE & Editor settings
 .vscode/
