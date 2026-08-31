@@ -18,9 +18,12 @@ import axios, { AxiosError, type AxiosInstance, type AxiosRequestConfig } from '
 /* Configuration                                                              */
 /* -------------------------------------------------------------------------- */
 
-export const API_BASE_URL =
-  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_BASE_URL) ||
+const rawApiUrl =
+  (typeof import.meta !== 'undefined' &&
+    (import.meta.env?.VITE_API_BASE_URL || import.meta.env?.NEXT_PUBLIC_API_BASE_URL)) ||
   'http://localhost:8000';
+
+export const API_BASE_URL = rawApiUrl.replace(/\/+$/, '');
 
 export const API_TIMEOUT = Number(
   (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_TIMEOUT) ?? 30_000
