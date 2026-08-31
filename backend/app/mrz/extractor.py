@@ -47,7 +47,7 @@ def crop_mrz_region(
     if method in ("auto", "morphological"):
         try:
             gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if len(image.shape) == 3 else image
-            rect_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (13, 5))
+            rect_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (25, 12))
             blackhat = cv2.morphologyEx(gray, cv2.MORPH_BLACKHAT, rect_kernel)
 
             grad_x = cv2.Sobel(blackhat, ddepth=cv2.CV_32F, dx=1, dy=0, ksize=-1)
@@ -59,7 +59,7 @@ def crop_mrz_region(
             grad_x = cv2.morphologyEx(grad_x, cv2.MORPH_CLOSE, rect_kernel)
             thresh = cv2.threshold(grad_x, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
 
-            sq_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (21, 21))
+            sq_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (35, 25))
             thresh = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, sq_kernel)
             thresh = cv2.erode(thresh, None, iterations=2)
 
@@ -68,14 +68,19 @@ def crop_mrz_region(
             for c in contours:
                 (x, y, cw, ch) = cv2.boundingRect(c)
                 ar = cw / float(ch)
-                if ar > 3.0 and cw > (w * 0.5) and y > (h * 0.55):
+                if cw > (w * 0.45) and y > (h * 0.50):
                     candidates.append((x, y, cw, ch))
 
             if candidates:
                 candidates.sort(key=lambda item: (item[1], item[2]), reverse=True)
                 bx, by, bw, bh = candidates[0]
-                pad_x = int(w * 0.02)
-                pad_y = int(h * 0.02)
+                # Ensure height covers both lines (at least 15% of document)
+                min_mrz_h = int(h * 0.16)
+                if bh < min_mrz_h:
+                    by = max(0, by - (min_mrz_h - bh))
+                    bh = min_mrz_h
+                pad_x = int(w * 0.03)
+                pad_y = int(h * 0.03)
                 x1 = max(0, bx - pad_x)
                 y1 = max(0, by - pad_y)
                 x2 = min(w, bx + bw + pad_x)
@@ -84,8 +89,8 @@ def crop_mrz_region(
         except Exception:
             pass
 
-    # Fallback to Geometric standard crop (lower 23% of document)
-    mrz_h = int(h * 0.23)
+    # Fallback to Geometric standard crop (lower 26% of document)
+    mrz_h = int(h * 0.26)
     y1 = h - mrz_h
     return image[y1:h, 0:w], {"x": 0, "y": y1, "w": w, "h": mrz_h}
 
