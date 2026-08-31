@@ -69,7 +69,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
         <ShiftClock />
 
         {can('screening:create') && (
-          <Button size="sm" icon={<ScanLine className="size-3.5" />} onClick={() => router.push('/screening/new')}>
+          <Button variant="peach" size="sm" icon={<ScanLine className="size-3.5" />} onClick={() => router.push('/screening/new')}>
             <span className="hidden sm:inline">New Screening</span>
             <span className="sm:hidden">New</span>
           </Button>

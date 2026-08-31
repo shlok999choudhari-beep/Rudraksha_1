@@ -40,13 +40,13 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
           collapsed && 'justify-center px-0',
         )}
       >
-        <span className="grid size-9 shrink-0 place-items-center rounded-lg border border-border-strong bg-surface-raised text-foreground">
-          <ShieldCheck className="size-5 text-foreground" aria-hidden />
+        <span className="grid size-9 shrink-0 place-items-center rounded-xl border border-peach-200/90 bg-gradient-to-br from-peach-100 to-peach-50 text-peach-600 shadow-sm">
+          <ShieldCheck className="size-5 text-peach-600" aria-hidden />
         </span>
         {!collapsed && (
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold tracking-tight text-foreground">
-              VeriGuard
+            <p className="truncate text-sm font-bold tracking-tight text-foreground">
+              VeriGuard <span className="text-2xs font-mono font-normal text-peach-600 uppercase ml-1 px-1.5 py-0.5 rounded bg-peach-100/80 border border-peach-200/60">AI</span>
             </p>
             <p className="truncate font-mono text-2xs uppercase tracking-[0.16em] text-muted-foreground">
               Officer Console
@@ -58,7 +58,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       <nav className="no-scrollbar flex-1 overflow-y-auto px-2.5 py-4">
         {sections.map((section) => (
           <div key={section.label} className="mb-5 last:mb-0">
-            {!collapsed && <p className="section-label mb-2 px-2.5">{section.label}</p>}
+            {!collapsed && <p className="section-label mb-2 px-2.5 text-muted-foreground/80">{section.label}</p>}
             {collapsed && <div className="mx-3 mb-2 h-px bg-border" />}
             <ul className="space-y-0.5">
               {section.items.map((item) => {
@@ -71,21 +71,21 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                       title={collapsed ? item.label : undefined}
                       aria-current={active ? 'page' : undefined}
                       className={cn(
-                        'group relative flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm transition-colors',
+                        'group relative flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm transition-all',
                         collapsed && 'justify-center px-0',
                         active
-                          ? 'bg-surface-raised text-foreground font-medium'
+                          ? 'bg-peach-100/70 text-peach-950 font-semibold shadow-[0_1px_3px_0_rgba(245,123,74,0.06)]'
                           : 'text-muted-foreground hover:bg-surface-muted hover:text-foreground',
                       )}
                     >
                       {active && (
-                        <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-r bg-foreground" />
+                        <span className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r bg-peach-500" />
                       )}
                       <Icon
                         className={cn(
                           'size-[1.05rem] shrink-0 transition-colors',
                           active
-                            ? 'text-foreground'
+                            ? 'text-peach-600'
                             : 'text-muted-foreground group-hover:text-foreground',
                         )}
                         aria-hidden

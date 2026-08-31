@@ -60,8 +60,8 @@ export function DocumentTypeSelector({
               className={cn(
                 'flex items-start gap-3.5 p-4 rounded-xl border text-left transition-all',
                 isSelected
-                  ? 'border-primary bg-primary/10 shadow-sm shadow-primary/10 ring-1 ring-primary/30'
-                  : 'border-border bg-surface hover:border-border-strong hover:bg-surface-muted',
+                  ? 'border-peach-400 bg-gradient-to-br from-peach-50/90 to-surface shadow-[0_4px_16px_-4px_rgba(245,123,74,0.15)] ring-1 ring-peach-400/50'
+                  : 'border-border bg-surface hover:border-peach-200 hover:bg-surface-muted/60',
                 disabled && 'opacity-60 cursor-not-allowed'
               )}
             >
@@ -69,7 +69,7 @@ export function DocumentTypeSelector({
                 className={cn(
                   'grid size-10 place-items-center rounded-lg border shrink-0',
                   isSelected
-                    ? 'border-primary/40 bg-primary/20 text-primary'
+                    ? 'border-peach-300 bg-peach-100 text-peach-700'
                     : 'border-border bg-surface-muted text-muted-foreground'
                 )}
               >
@@ -78,10 +78,15 @@ export function DocumentTypeSelector({
 
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="font-medium text-sm text-foreground">
+                  <span className={cn('text-sm', isSelected ? 'font-bold text-peach-950' : 'font-medium text-foreground')}>
                     {item.label}
                   </span>
-                  <span className="font-mono text-[10px] text-muted-foreground rounded bg-surface-muted px-1.5 py-0.5 border border-border">
+                  <span className={cn(
+                    'font-mono text-[10px] rounded px-1.5 py-0.5 border',
+                    isSelected
+                      ? 'bg-peach-100/90 text-peach-800 border-peach-200 font-semibold'
+                      : 'bg-surface-muted text-muted-foreground border-border'
+                  )}>
                     {item.spec}
                   </span>
                 </div>

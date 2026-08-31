@@ -11,19 +11,21 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          'bg-foreground text-background hover:bg-foreground/90 font-semibold shadow-sm',
+          'bg-foreground text-background hover:bg-foreground/90 font-semibold shadow-sm hover:shadow-[0_4px_12px_-2px_rgba(40,30,25,0.15)]',
+        peach:
+          'bg-gradient-to-r from-peach-500 to-peach-600 text-white hover:from-peach-600 hover:to-peach-700 font-semibold shadow-sm hover:shadow-[0_4px_16px_-2px_rgba(245,123,74,0.3)]',
         secondary:
-          'bg-surface-raised text-foreground border border-border-strong hover:bg-accent hover:border-muted-foreground/40',
+          'bg-peach-50/80 text-peach-950 border border-peach-200 hover:bg-peach-100 hover:border-peach-300 font-medium transition-colors',
         outline:
-          'border border-border-strong bg-transparent text-foreground hover:bg-surface-muted hover:text-foreground',
-        ghost: 'text-muted-foreground hover:bg-surface-muted hover:text-foreground',
+          'border border-border-strong bg-surface text-foreground hover:bg-peach-50/50 hover:border-peach-300 hover:text-foreground',
+        ghost: 'text-muted-foreground hover:bg-peach-50/60 hover:text-foreground',
         destructive:
           'bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-sm',
         // For escalation and other high-consequence officer actions.
         warning:
           'bg-risk-medium/10 text-risk-medium border border-risk-medium/30 hover:bg-risk-medium/20',
         success: 'bg-risk-low/10 text-risk-low border border-risk-low/30 hover:bg-risk-low/20',
-        link: 'text-foreground underline-offset-4 hover:underline',
+        link: 'text-peach-700 underline-offset-4 hover:underline hover:text-peach-800',
       },
       size: {
         sm: 'h-8 px-3 text-xs [&_svg]:size-3.5',

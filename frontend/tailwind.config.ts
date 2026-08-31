@@ -87,6 +87,33 @@ const config: Config = {
           DEFAULT: 'hsl(var(--ai))',
           soft: 'hsl(var(--ai-soft))',
         },
+        // Soft warm peach palette
+        peach: {
+          50: '#FFF7F2',
+          100: '#FFF0E6',
+          200: '#FDE1D0',
+          300: '#FBCBB1',
+          400: '#F8A47E',
+          500: '#F57B4A',
+          600: '#E25927',
+          700: '#BD4017',
+          800: '#983416',
+          900: '#7B2E17',
+          950: '#431408',
+        },
+        // Warm Alabaster / Off-white neutral palette
+        alabaster: {
+          50: '#FAF7F2',
+          100: '#F5EFE8',
+          200: '#ECE2D5',
+          300: '#DECFC0',
+          400: '#CAB5A2',
+          500: '#B69B85',
+          600: '#A3846E',
+          700: '#866B58',
+          800: '#6E584A',
+          900: '#5A493D',
+        },
       },
       borderRadius: {
         lg: 'var(--radius)',
@@ -106,8 +133,10 @@ const config: Config = {
         '5.5': '1.375rem',
       },
       boxShadow: {
-        panel: '0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px -1px rgba(0, 0, 0, 0.04)',
-        glow: '0 0 0 1px hsl(var(--border-strong)), 0 4px 12px -2px rgba(0, 0, 0, 0.06)',
+        panel: '0 2px 8px -2px rgba(240, 110, 70, 0.05), 0 1px 3px 0 rgba(0, 0, 0, 0.03)',
+        'panel-peach': '0 4px 20px -4px rgba(245, 123, 74, 0.12), 0 2px 6px -1px rgba(0, 0, 0, 0.03)',
+        glow: '0 0 0 1px hsl(var(--border-strong)), 0 4px 14px -2px rgba(245, 123, 74, 0.08)',
+        'glow-peach': '0 0 0 1px #FBCBB1, 0 4px 16px -2px rgba(245, 123, 74, 0.18)',
         'glow-high': '0 0 0 1px hsl(var(--risk-high) / 0.35)',
         'glow-low': '0 0 0 1px hsl(var(--risk-low) / 0.35)',
         'glow-medium': '0 0 0 1px hsl(var(--risk-medium) / 0.35)',
@@ -115,9 +144,11 @@ const config: Config = {
       backgroundImage: {
         grid: 'linear-gradient(hsl(var(--border) / 0.7) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--border) / 0.7) 1px, transparent 1px)',
         'radial-fade':
-          'radial-gradient(ellipse 80% 50% at 50% -10%, rgba(0, 0, 0, 0.02), transparent 70%)',
+          'radial-gradient(ellipse 80% 50% at 50% -10%, rgba(245, 123, 74, 0.06), transparent 70%)',
+        'peach-gradient':
+          'linear-gradient(135deg, #FFF7F2 0%, #FFF0E6 50%, #FFFDFB 100%)',
         shimmer:
-          'linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.04), transparent)',
+          'linear-gradient(90deg, transparent, rgba(245, 123, 74, 0.05), transparent)',
       },
       backgroundSize: {
         grid: '32px 32px',

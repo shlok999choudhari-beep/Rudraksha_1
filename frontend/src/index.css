@@ -4,46 +4,58 @@
 
 @layer base {
   :root {
-    --background: 0 0% 98.5%;
-    --foreground: 240 10% 4%;
+    /* Off-white warm canvas (Warm Alabaster / Ivory Linen) */
+    --background: 32 30% 97.5%;
+    --foreground: 24 22% 14%;
 
-    --surface: 0 0% 100%;
-    --surface-muted: 240 5% 96%;
-    --surface-raised: 240 6% 92%;
+    /* Warm pristine surfaces */
+    --surface: 35 45% 99.2%;
+    --surface-muted: 28 35% 95%;
+    --surface-raised: 25 48% 92%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 4%;
+    --card: 35 45% 99.2%;
+    --card-foreground: 24 22% 14%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 4%;
+    --popover: 35 45% 99.2%;
+    --popover-foreground: 24 22% 14%;
 
-    --primary: 240 10% 4%;
+    /* Warm Peach / Coral Primary */
+    --primary: 16 88% 54%;
     --primary-foreground: 0 0% 100%;
-    --primary-muted: 240 5% 92%;
+    --primary-muted: 20 90% 95%;
 
-    --secondary: 240 5% 96%;
-    --secondary-foreground: 240 10% 4%;
+    /* Soft Peach Secondary */
+    --secondary: 22 65% 94%;
+    --secondary-foreground: 16 65% 26%;
 
-    --muted: 240 5% 96%;
-    --muted-foreground: 240 4% 46%;
+    --muted: 28 30% 94%;
+    --muted-foreground: 24 14% 46%;
 
-    --accent: 240 5% 94%;
-    --accent-foreground: 240 10% 4%;
+    /* Light Peach Accent */
+    --accent: 18 90% 95%;
+    --accent-foreground: 16 85% 32%;
 
-    --destructive: 0 78% 50%;
+    --destructive: 358 75% 52%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 240 6% 89%;
-    --border-strong: 240 6% 78%;
-    --input: 240 6% 89%;
-    --ring: 240 10% 4%;
+    /* Delicate warm peach-taupe borders */
+    --border: 26 28% 88.5%;
+    --border-strong: 24 32% 78%;
+    --input: 26 28% 88.5%;
+    --ring: 16 88% 54%;
 
-    --risk-low: 152 65% 34%;
-    --risk-medium: 35 92% 40%;
-    --risk-high: 0 78% 50%;
-    --risk-unknown: 240 4% 46%;
+    /* Risk indicators harmonized with warm backdrop */
+    --risk-low: 154 58% 34%;
+    --risk-medium: 33 94% 40%;
+    --risk-high: 358 75% 52%;
+    --risk-unknown: 24 14% 46%;
 
-    --radius: 0.5rem;
+    --rule: 205 85% 45%;
+    --rule-soft: 205 90% 95%;
+    --ai: 275 75% 55%;
+    --ai-soft: 275 90% 96%;
+
+    --radius: 0.625rem;
   }
 
   * {
@@ -68,7 +80,7 @@
     background: hsl(var(--background));
   }
   ::-webkit-scrollbar-thumb {
-    background: hsl(var(--border-strong));
+    background: hsl(var(--border-strong) / 0.8);
     border-radius: 999px;
   }
   ::-webkit-scrollbar-thumb:hover {
@@ -82,6 +94,14 @@
   }
 
   .panel {
-    @apply relative rounded-xl border border-border bg-card shadow-[0_1px_3px_0_rgba(0,0,0,0.03),0_1px_2px_-1px_rgba(0,0,0,0.03)];
+    @apply relative rounded-xl border border-border bg-card shadow-[0_2px_8px_-2px_rgba(240,110,70,0.05),0_1px_3px_0_rgba(0,0,0,0.03)];
+  }
+
+  .panel-peach {
+    @apply relative rounded-xl border border-peach-200/80 bg-gradient-to-br from-peach-50/60 to-surface p-5 shadow-[0_4px_16px_-4px_rgba(245,123,74,0.1)];
+  }
+
+  .peach-glow {
+    box-shadow: 0 0 0 1px hsl(var(--primary) / 0.3), 0 4px 16px -2px rgba(245, 123, 74, 0.15);
   }
 }

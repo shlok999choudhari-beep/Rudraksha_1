@@ -103,20 +103,20 @@ export function DocumentUploader({
         className={cn(
           'relative flex flex-col items-center justify-center p-8 sm:p-10 rounded-2xl border-2 border-dashed text-center cursor-pointer transition-all duration-200',
           isDragOver
-            ? 'border-primary bg-primary/10 ring-2 ring-primary/20 scale-[0.995]'
-            : 'border-border bg-surface-muted/30 hover:border-border-strong hover:bg-surface-muted/60',
+            ? 'border-peach-400 bg-peach-50/60 ring-4 ring-peach-200/50 scale-[0.995]'
+            : 'border-border bg-gradient-to-b from-surface to-surface-muted/40 hover:border-peach-300 hover:bg-peach-50/20 shadow-sm',
           isUploading && 'opacity-60 pointer-events-none'
         )}
       >
-        <div className="grid size-16 place-items-center rounded-2xl border border-primary/30 bg-primary/10 text-primary mb-4 shadow-sm shadow-primary/10">
+        <div className="grid size-16 place-items-center rounded-2xl border border-peach-200 bg-gradient-to-br from-peach-100 to-peach-50 text-peach-600 mb-4 shadow-[0_4px_16px_-4px_rgba(245,123,74,0.2)]">
           {isUploading ? (
-            <RefreshCw className="size-8 animate-spin text-primary" />
+            <RefreshCw className="size-8 animate-spin text-peach-600" />
           ) : (
             <UploadCloud className="size-8" />
           )}
         </div>
 
-        <h3 className="text-sm font-semibold text-foreground">
+        <h3 className="text-sm font-bold text-foreground">
           {isUploading ? 'Analyzing Document Capture...' : 'Drag and Drop Document Scan or Photo'}
         </h3>
         <p className="text-xs text-muted-foreground mt-1 max-w-sm">

@@ -257,11 +257,10 @@ export default function NewScreeningPage() {
 
                 <div className="flex justify-end gap-3 pt-2">
                   <Button
-                    variant="default"
+                    variant="peach"
                     size="lg"
                     onClick={handleProceedToFace}
                     disabled={!document.quality.isAcceptable}
-                    className="shadow-md shadow-primary/20"
                   >
                     <span>Proceed to Live Face Capture</span>
                     <ArrowRight className="size-4 ml-2" />
@@ -297,10 +296,9 @@ export default function NewScreeningPage() {
               </Button>
 
               <Button
-                variant="default"
+                variant="peach"
                 size="lg"
                 onClick={handleStartAnalysis}
-                className="shadow-md shadow-primary/20"
               >
                 <Cpu className="size-4 mr-2" />
                 <span>Run Forensic Analysis Pipeline</span>
