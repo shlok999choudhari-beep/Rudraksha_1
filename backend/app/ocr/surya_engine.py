@@ -138,31 +138,26 @@ class SuryaOCREngine:
             except Exception:
                 pass
 
-        # 3. Extract MRZ Lines
-        mrz_candidate_lines = [
-            l.text.replace(' ', '').upper()
-            for l in text_lines
-            if len(l.text.replace(' ', '')) >= 25 and ('<' in l.text or l.text.startswith('P<') or l.text.startswith('V<') or l.text.startswith('I<'))
-        ]
-
-        if not mrz_candidate_lines:
-            try:
-                from backend.app.mrz.extractor import extract_and_parse_mrz_from_image
-                mrz_res = extract_and_parse_mrz_from_image(image)
-                if mrz_res.mrz_lines:
-                    mrz_candidate_lines = mrz_res.mrz_lines
-            except Exception:
-                pass
-
-        # 4. Parse MRZ
+        # 3. High-Precision MRZ Extraction & Parsing
+        mrz_candidate_lines = []
         mrz_parsed = None
-        if mrz_candidate_lines and len(mrz_candidate_lines) >= 2:
+        try:
+            from backend.app.mrz.extractor import extract_and_parse_mrz_from_image
+            mrz_res = extract_and_parse_mrz_from_image(image)
+            if mrz_res.mrz_lines:
+                mrz_candidate_lines = mrz_res.mrz_lines
+            if mrz_res.parsed_data:
+                mrz_parsed = mrz_res.parsed_data
+        except Exception:
+            pass
+
+        if not mrz_parsed and mrz_candidate_lines and len(mrz_candidate_lines) >= 2:
             try:
                 mrz_parsed = parse_mrz(mrz_candidate_lines)
             except Exception:
                 pass
 
-        # 5. Extract / Derive VIZ Data Payload dynamically
+        # 4. Extract / Derive VIZ Data Payload dynamically
         viz_data = self._extract_viz_from_lines_and_mrz(text_lines, mrz_parsed)
 
         return OCRDocumentLayoutResult(
@@ -183,17 +178,13 @@ class SuryaOCREngine:
         Synthesizes structured VIZ fields by parsing recognized 2D text layout patterns,
         with fallback to parsed MRZ values or document visual anchors.
         """
-        # Baseline fallback from MRZ if available
-        passport_no = mrz_parsed.document_number if (mrz_parsed and mrz_parsed.document_number) else "P8842910"
-        surname = mrz_parsed.surname if (mrz_parsed and mrz_parsed.surname) else "SHARMA"
-        given_names = mrz_parsed.given_names if (mrz_parsed and mrz_parsed.given_names) else "PRIYA"
-        dob = str(mrz_parsed.date_of_birth) if (mrz_parsed and mrz_parsed.date_of_birth) else "1994-08-15"
-        expiry = str(mrz_parsed.date_of_expiry) if (mrz_parsed and mrz_parsed.date_of_expiry) else "2034-08-14"
-        nationality = mrz_parsed.nationality if (mrz_parsed and mrz_parsed.nationality) else "IND"
-        sex = mrz_parsed.sex if (mrz_parsed and mrz_parsed.sex) else "F"
+        passport_no = mrz_parsed.document_number if (mrz_parsed and mrz_parsed.document_number) else ""
+        surname = mrz_parsed.surname if (mrz_parsed and mrz_parsed.surname) else ""
+        given_names = mrz_parsed.given_names if (mrz_parsed and mrz_parsed.given_names) else ""
+        dob = str(mrz_parsed.date_of_birth) if (mrz_parsed and mrz_parsed.date_of_birth) else ""
         expiry = str(mrz_parsed.date_of_expiry) if (mrz_parsed and mrz_parsed.date_of_expiry) else ""
-        nationality = mrz_parsed.nationality if mrz_parsed else ""
-        sex = mrz_parsed.sex if mrz_parsed else ""
+        nationality = mrz_parsed.nationality if (mrz_parsed and mrz_parsed.nationality) else ""
+        sex = mrz_parsed.sex if (mrz_parsed and mrz_parsed.sex) else ""
 
         # Map of visual labels to search for
         label_keywords_map = {
