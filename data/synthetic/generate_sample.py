@@ -74,19 +74,31 @@ def generate_synthetic_passport(
         ("Passport No. / No. du Passeport", doc_number),
         ("Surname / Nom", surname),
         ("Given Names / Prenoms", name),
-        ("Nationality / Nationalite", "UTOPIAN"),
-        ("Date of Birth / Date de Naissance", "12 JUL 1985"),
+        ("Nationality / Nationalite", "INDIAN" if nationality == "IND" else "UTOPIAN"),
+        ("Date of Birth / Date de Naissance", "15 AUG 1998" if dob == "980815" else "12 JUL 1985"),
         ("Sex / Sexe", sex),
-        ("Date of Issue / Date de Delivrance", "01 JAN 2020"),
-        ("Date of Expiry / Date d'Expiration", "01 JAN 2030"),
+        ("Date of Issue / Date de Delivrance", "10 MAR 2021"),
+        ("Date of Expiry / Date d'Expiration", "09 MAR 2031" if expiry == "310309" else "01 JAN 2030"),
     ]
+
+    # Convert to PIL for crisp TrueType rendering
+    from PIL import Image, ImageDraw, ImageFont
+    pil_img = Image.fromarray(cv2.cvtColor(passport, cv2.COLOR_BGR2RGB))
+    draw = ImageDraw.Draw(pil_img)
+
+    try:
+        f_lbl = ImageFont.truetype("arial.ttf", 15)
+        f_val = ImageFont.truetype("arialbd.ttf", 22)
+        f_mrz = ImageFont.truetype("courbd.ttf", 28)
+    except Exception:
+        f_lbl = f_val = f_mrz = ImageFont.load_default()
 
     for i, (label, val) in enumerate(fields):
         col = field_x if i < 5 else field_x + 400
         row_idx = i if i < 5 else i - 5
         curr_y = start_y + (row_idx * line_gap)
-        cv2.putText(passport, label, (col, curr_y), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (100, 100, 100), 1)
-        cv2.putText(passport, val, (col, curr_y + 24), cv2.FONT_HERSHEY_DUPLEX, 0.75, (20, 20, 20), 2)
+        draw.text((col, curr_y), label, fill=(100, 100, 100), font=f_lbl)
+        draw.text((col, curr_y + 20), val, fill=(20, 20, 20), font=f_val)
 
     # Compute valid ICAO 9303 check digits
     doc_padded = doc_number.ljust(9, '<')[:9]
@@ -98,16 +110,18 @@ def generate_synthetic_passport(
     composite_payload = f"{doc_padded}{doc_chk}{dob}{dob_chk}{expiry}{exp_chk}{opt_data}{opt_chk}"
     composite_chk = compute_check_digit(composite_payload)
 
-    # ICAO Doc 9303 TD3 Machine Readable Zone (MRZ - 2 lines of 44 chars)
+    # ICAO Doc 9303 TD3 Machine Readable Zone (MRZ)
     mrz_bg_y = h - 220
-    cv2.rectangle(passport, (40, mrz_bg_y), (w - 40, h - 40), (255, 255, 255), -1)
-    cv2.line(passport, (40, mrz_bg_y), (w - 40, mrz_bg_y), (150, 150, 150), 1)
+    draw.rectangle([(40, mrz_bg_y), (w - 40, h - 40)], fill=(255, 255, 255))
+    draw.line([(40, mrz_bg_y), (w - 40, mrz_bg_y)], fill=(150, 150, 150), width=1)
 
     mrz_line1 = f"P<{nationality}{surname}<<{name}".ljust(44, '<')[:44]
     mrz_line2 = f"{doc_padded}{doc_chk}{nationality}{dob}{dob_chk}{sex}{expiry}{exp_chk}{opt_data}{opt_chk}{composite_chk}".ljust(44, '<')[:44]
 
-    cv2.putText(passport, mrz_line1, (70, mrz_bg_y + 65), cv2.FONT_HERSHEY_SIMPLEX, 0.95, (10, 10, 10), 2)
-    cv2.putText(passport, mrz_line2, (70, mrz_bg_y + 135), cv2.FONT_HERSHEY_SIMPLEX, 0.95, (10, 10, 10), 2)
+    draw.text((70, mrz_bg_y + 40), mrz_line1, fill=(10, 10, 10), font=f_mrz)
+    draw.text((70, mrz_bg_y + 110), mrz_line2, fill=(10, 10, 10), font=f_mrz)
+
+    passport = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
 
     if not tilt_and_place:
         output_path = os.path.join("data/synthetic", output_filename)
