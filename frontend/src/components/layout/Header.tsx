@@ -1,0 +1,153 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { Menu, Search, ScanLine, ShieldAlert } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { LiveDot } from '@/components/ui/StatusIndicator';
+import { Tooltip } from '@/components/ui/Tooltip';
+import { cn } from '@/lib/utils/cn';
+import { formatTime } from '@/lib/utils/dates';
+import { useServiceHealth } from '@/lib/hooks/useDashboard';
+import { useAuth } from '@/providers/AuthProvider';
+import { Breadcrumbs } from './Breadcrumbs';
+import { UserMenu } from './UserMenu';
+
+interface HeaderProps {
+  onToggleSidebar: () => void;
+}
+
+const CASE_ID_PATTERN = /^VG-\d{4}-\d{3,}$/i;
+
+export function Header({ onToggleSidebar }: HeaderProps) {
+  const router = useRouter();
+  const { can } = useAuth();
+  const { data: health } = useServiceHealth();
+  const [query, setQuery] = useState('');
+
+  const onSearch = (event: React.FormEvent) => {
+    event.preventDefault();
+    const value = query.trim();
+    if (!value) return;
+    // A full case reference jumps straight to the record; anything else is a search.
+    if (CASE_ID_PATTERN.test(value)) router.push(`/cases/${value.toUpperCase()}`);
+    else router.push(`/cases?search=${encodeURIComponent(value)}`);
+    setQuery('');
+  };
+
+  return (
+    <header className="sticky top-0 z-30 border-b border-border bg-surface/90 backdrop-blur-md">
+      <div className="flex h-16 items-center gap-3 px-4 lg:px-6">
+        <button
+          type="button"
+          onClick={onToggleSidebar}
+          className="grid size-9 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground lg:hidden"
+          aria-label="Toggle navigation"
+        >
+          <Menu className="size-4" aria-hidden />
+        </button>
+
+        <Breadcrumbs />
+
+        <form onSubmit={onSearch} className="ml-auto hidden w-full max-w-xs md:block">
+          <div className="relative">
+            <Search
+              className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
+              aria-hidden
+            />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Case ID, holder or document no."
+              aria-label="Search cases"
+              className="h-9 w-full rounded-lg border border-input bg-surface-muted pl-9 pr-3 text-xs text-foreground placeholder:text-muted-foreground/60 focus:border-border-strong focus:outline-none focus:ring-1 focus:ring-ring"
+            />
+          </div>
+        </form>
+
+        <ServiceStatus status={health?.status} className="ml-auto md:ml-0" />
+        <ShiftClock />
+
+        {can('screening:create') && (
+          <Button size="sm" icon={<ScanLine className="size-3.5" />} onClick={() => router.push('/screening/new')}>
+            <span className="hidden sm:inline">New Screening</span>
+            <span className="sm:hidden">New</span>
+          </Button>
+        )}
+
+        <UserMenu />
+      </div>
+
+      {/*
+        Kept permanently on screen rather than shown once at sign-in. The system
+        produces evidence and a risk indication; the decision stays with the
+        officer, and the interface should never let that slip out of view.
+      */}
+      <div className="flex items-center gap-2 border-t border-border/60 bg-surface-muted/40 px-4 py-1.5 lg:px-6">
+        <ShieldAlert className="size-3 shrink-0 text-muted-foreground" aria-hidden />
+        <p className="truncate font-mono text-2xs uppercase tracking-[0.14em] text-muted-foreground">
+          Decision support — every result requires officer verification. No automated admission or refusal.
+        </p>
+      </div>
+    </header>
+  );
+}
+
+function ServiceStatus({
+  status,
+  className,
+}: {
+  status?: 'ok' | 'degraded' | 'unreachable';
+  className?: string;
+}) {
+  const config = {
+    ok: { tone: 'low' as const, label: 'Service online', detail: 'Analysis services responding normally.' },
+    degraded: {
+      tone: 'medium' as const,
+      label: 'Degraded',
+      detail: 'One or more analysis components reported a problem. Expect partial analyses.',
+    },
+    unreachable: {
+      tone: 'high' as const,
+      label: 'Unreachable',
+      detail: 'The screening service is not responding. New screenings cannot be run.',
+    },
+  }[status ?? 'ok'];
+
+  return (
+    // The responsive class lives on the wrapper, not the trigger: Tooltip renders
+    // its own inline-flex root, which would otherwise stay in the layout.
+    <div className={cn('hidden sm:block', className)}>
+      <Tooltip content={config.detail} side="bottom">
+        <span className="flex items-center gap-2 rounded-lg border border-border bg-surface px-2.5 py-1.5">
+          <LiveDot tone={config.tone} />
+          <span className="text-2xs font-medium text-muted-foreground">{config.label}</span>
+        </span>
+      </Tooltip>
+    </div>
+  );
+}
+
+/**
+ * Wall clock, mounted client-side only.
+ * Rendering a time on the server would guarantee a hydration mismatch, so the
+ * slot stays empty until the first tick.
+ */
+function ShiftClock() {
+  const [now, setNow] = useState<Date | null>(null);
+
+  useEffect(() => {
+    setNow(new Date());
+    const timer = window.setInterval(() => setNow(new Date()), 1_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  return (
+    <span
+      className="hidden w-[4.75rem] shrink-0 text-right font-mono text-xs tabular text-muted-foreground lg:block"
+      aria-hidden={now === null}
+    >
+      {now ? formatTime(now) : ''}
+    </span>
+  );
+}

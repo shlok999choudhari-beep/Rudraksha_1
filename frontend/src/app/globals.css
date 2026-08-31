@@ -1,0 +1,164 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* ------------------------------------------------------------------
+       VeriGuard — Minimalist Clean White & Black Design
+       Dominant: Crisp Pure White & Light Off-White (#FFFFFF / #FAFAFA)
+       Accents: Deep Black (#09090B) and Neutral Slate
+       ------------------------------------------------------------------ */
+    --background: 0 0% 98.5%;
+    --foreground: 240 10% 4%;
+
+    --surface: 0 0% 100%;
+    --surface-muted: 240 5% 96%;
+    --surface-raised: 240 6% 92%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 4%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 4%;
+
+    --primary: 240 10% 4%;
+    --primary-foreground: 0 0% 100%;
+    --primary-muted: 240 5% 92%;
+
+    --secondary: 240 5% 96%;
+    --secondary-foreground: 240 10% 4%;
+
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 4% 46%;
+
+    --accent: 240 5% 94%;
+    --accent-foreground: 240 10% 4%;
+
+    --destructive: 0 78% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 240 6% 89%;
+    --border-strong: 240 6% 78%;
+    --input: 240 6% 89%;
+    --ring: 240 10% 4%;
+
+    /* Crisp, readable risk semantics in white mode */
+    --risk-low: 152 65% 34%;
+    --risk-medium: 35 92% 40%;
+    --risk-high: 0 78% 50%;
+    --risk-unknown: 240 4% 46%;
+
+    /* Minimalist rule and model tags */
+    --rule: 215 25% 40%;
+    --rule-soft: 215 25% 95%;
+    --ai: 240 10% 4%;
+    --ai-soft: 240 5% 94%;
+
+    --radius: 0.5rem;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    color-scheme: light;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Discreet light scrollbars. */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: hsl(var(--background));
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--border-strong));
+    border-radius: 999px;
+    border: 2px solid hsl(var(--background));
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.8);
+  }
+
+  :focus-visible {
+    @apply outline-none ring-1 ring-ring ring-offset-1 ring-offset-background;
+  }
+
+  /* Numeric tables (scores, confidences) must align vertically. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer components {
+  /* Section label used above every evidence block. */
+  .section-label {
+    @apply text-2xs font-semibold uppercase tracking-[0.14em] text-muted-foreground;
+  }
+
+  /* Clean white card panel with subtle crisp border and light shadow. */
+  .panel {
+    @apply relative rounded-lg border border-border bg-card shadow-sm;
+  }
+  .panel-lit::before {
+    content: '';
+    @apply pointer-events-none absolute inset-x-6 -top-px h-px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      hsl(var(--foreground) / 0.1),
+      transparent
+    );
+  }
+
+  /* Clean faint grid for empty surfaces. */
+  .blueprint {
+    @apply bg-grid bg-grid;
+  }
+
+  .stripe-progress {
+    background-image: linear-gradient(
+      45deg,
+      hsl(var(--foreground) / 0.85) 25%,
+      hsl(var(--foreground) / 0.25) 25%,
+      hsl(var(--foreground) / 0.25) 50%,
+      hsl(var(--foreground) / 0.85) 50%,
+      hsl(var(--foreground) / 0.85) 75%,
+      hsl(var(--foreground) / 0.25) 75%
+    );
+    background-size: 24px 24px;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
