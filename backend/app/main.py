@@ -156,6 +156,41 @@ def root():
     }
 
 
+@app.get("/api/test-screening")
+def test_screening_diagnostic():
+    """Runs pipeline on synthetic specimen and returns step-by-step diagnostic breakdown."""
+    import time, traceback
+    t0 = time.time()
+    steps = {}
+    try:
+        from backend.app.risk.screener import screen_document_and_identity
+        doc_path = "data/synthetic/sample_tilted_passport.jpg"
+        if not os.path.exists(doc_path):
+            doc_path = generate_synthetic_passport(tilt_and_place=False)
+        img = cv2.imread(doc_path)
+        steps["image_loaded"] = True
+        
+        rep = screen_document_and_identity(img)
+        t1 = time.time()
+        return {
+            "success": True,
+            "duration_s": round(t1 - t0, 2),
+            "screening_id": rep.screening_id,
+            "ocr_lines_count": len(rep.ocr_layout_report.text_lines),
+            "mrz_valid": rep.mrz_parsed_result.is_valid if rep.mrz_parsed_result else False,
+            "risk_score": rep.risk_assessment.overall_trust_score,
+            "steps": steps
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "duration_s": round(time.time() - t0, 2),
+            "error": str(e),
+            "traceback": traceback.format_exc(),
+            "steps": steps
+        }
+
+
 @app.get("/health")
 def health_check():
     """Health check endpoint to verify backend operational status."""
