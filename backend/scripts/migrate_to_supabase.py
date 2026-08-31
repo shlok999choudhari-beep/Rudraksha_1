@@ -57,8 +57,17 @@ def migrate_users(db):
     count = 0
     for email, udata in USERS_DB.items():
         existing = db.query(User).filter(User.email == email).first()
-        if not existing:
-            p_hash, salt = hash_password(udata.get("password", "borderguard2026"))
+        p_hash, salt = hash_password(udata.get("password", "borderguard2026"))
+        if existing:
+            existing.password_hash = p_hash
+            existing.salt = salt
+            existing.full_name = udata.get("name", "Officer")
+            existing.role = udata.get("role", "OFFICER")
+            existing.badge_number = udata.get("badge_number", "BG-0001")
+            existing.station_id = udata.get("station", "STATION-DEL-01")
+            existing.is_active = True
+            count += 1
+        else:
             user = User(
                 id=udata.get("id", str(uuid.uuid4())),
                 email=email,
@@ -73,7 +82,7 @@ def migrate_users(db):
             db.add(user)
             count += 1
     db.commit()
-    print(f"   Migrated {count} user accounts to Supabase.")
+    print(f"   Migrated/Synced {count} user accounts to Supabase.")
 
 
 def migrate_screening_cases(db):
