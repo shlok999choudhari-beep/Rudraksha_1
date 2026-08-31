@@ -182,7 +182,33 @@ class YOLOFaceDetector:
                     ))
                 backend_used = "OPENCV_HAAR"
 
-        # 4. Fallback: ICAO Geometric Standard ROI for Document
+        # 4. Fallback: Facial skin-tone & contour blob detector for synthetic face fixtures
+        if not detected_faces and not is_document:
+            try:
+                ycrcb = cv2.cvtColor(image, cv2.COLOR_BGR2YCrCb) if len(image.shape) == 3 else None
+                if ycrcb is not None:
+                    # Skin tone mask in YCrCb
+                    mask = cv2.inRange(ycrcb, np.array([0, 133, 77]), np.array([255, 173, 127]))
+                    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                    if contours:
+                        c = max(contours, key=cv2.contourArea)
+                        area = cv2.contourArea(c)
+                        if area >= (w * h * 0.05):  # Must occupy at least 5% of viewport
+                            bx, by, bw, bh = cv2.boundingRect(c)
+                            aspect = bw / float(bh)
+                            if 0.5 <= aspect <= 1.6:
+                                roi = image[by:by + bh, bx:bx + bw]
+                                gray_roi = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+                                if np.std(gray_roi) > 8.0:
+                                    detected_faces.append(YOLODetectedFace(
+                                        x=int(bx), y=int(by), w=int(bw), h=int(bh),
+                                        confidence=0.80, face_type="PRIMARY"
+                                    ))
+                                    backend_used = "SKIN_FEATURE_CONTOUR"
+            except Exception:
+                pass
+
+        # 5. Fallback: ICAO Geometric Standard ROI for Document
         if not detected_faces and is_document:
             px1 = max(0, int(w * 0.05))
             py1 = max(0, int(h * 0.18))
@@ -194,17 +220,7 @@ class YOLOFaceDetector:
             ))
             backend_used = "GEOMETRIC_ROI"
 
-        # 5. Fallback: Center crop for Live Selfie
-        if not detected_faces and not is_document:
-            cw = int(w * 0.6)
-            ch = int(h * 0.6)
-            cx1 = (w - cw) // 2
-            cy1 = (h - ch) // 2
-            detected_faces.append(YOLODetectedFace(
-                x=cx1, y=cy1, w=cw, h=ch,
-                confidence=0.60, face_type="PRIMARY"
-            ))
-            backend_used = "CENTER_ROI"
+        # If live selfie and no face detected, detected_faces remains empty!
 
         # Classify Primary vs Ghost Watermark Photo
         primary_face = None

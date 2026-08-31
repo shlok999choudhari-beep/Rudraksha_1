@@ -654,24 +654,28 @@ function buildFace(
   impersonation: boolean,
   liveFaceImageUrl?: string,
 ): FaceVerificationResult {
-  const similarity = impersonation ? rngFloat(rng, 0.33, 0.47) : rngFloat(rng, 0.89, 0.968);
+  const hasLiveFace = Boolean(liveFaceImageUrl);
+  const similarity = !hasLiveFace
+    ? 0.0
+    : impersonation
+      ? rngFloat(rng, 0.25, 0.42)
+      : rngFloat(rng, 0.89, 0.968);
+
+  const outcome = (hasLiveFace && similarity >= FACE_THRESHOLD) ? 'MATCH' : 'NO_MATCH';
 
   return {
     status: 'COMPLETED',
     similarity,
     threshold: FACE_THRESHOLD,
-    outcome: similarity >= FACE_THRESHOLD ? 'MATCH' : 'NO_MATCH',
+    outcome,
     documentFaceUrl: faceSvgDataUri({ seed: identity.documentNumber, variant: 'document' }),
     liveFaceUrl:
       liveFaceImageUrl ??
-      faceSvgDataUri({
-        // A different seed for impersonation renders a visibly different person,
-        // so the side-by-side comparison reads clearly on a projector.
-        seed: impersonation ? `${identity.documentNumber}-alt` : identity.documentNumber,
-        variant: 'live',
-      }),
+      (impersonation
+        ? faceSvgDataUri({ seed: `${identity.documentNumber}-alt`, variant: 'live' })
+        : undefined),
     documentFaceQuality: 'GOOD',
-    liveFaceQuality: rng() > 0.75 ? 'ACCEPTABLE' : 'GOOD',
+    liveFaceQuality: hasLiveFace ? (rng() > 0.75 ? 'ACCEPTABLE' : 'GOOD') : 'POOR',
     modelVersion: 'vg-face-embed v1.2.0',
   };
 }

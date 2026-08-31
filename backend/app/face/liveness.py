@@ -14,10 +14,10 @@ class LivenessResult(BaseModel):
     is_live: bool = Field(..., description="True if face passes presentation attack detection")
     liveness_score: float = Field(..., description="0.0 (spoof) to 1.0 (genuine live person)")
     spoof_type: str = "GENUINE_LIVE_FACE"  # GENUINE_LIVE_FACE, SCREEN_REPLAY_SPOOF, PRINTED_PHOTO_SPOOF, LOW_QUALITY
-    confidence: float
-    moire_score: float
-    texture_score: float
-    color_diversity_score: float
+    confidence: float = 1.0
+    moire_score: float = 0.0
+    texture_score: float = 0.0
+    color_diversity_score: float = 0.0
     details: Optional[str] = None
 
 

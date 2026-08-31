@@ -77,7 +77,7 @@ def extract_face_crop(
             bbox = {"x": int(fx), "y": int(fy), "w": int(fw), "h": int(fh)}
             return resized, bbox, pf.confidence
 
-    # 2. Geometric ICAO Fallback for Document
+    # 2. Geometric ICAO Fallback for Document only
     if is_document:
         px1 = max(0, int(w * 0.05))
         py1 = max(0, int(h * 0.18))
@@ -90,15 +90,8 @@ def extract_face_crop(
             bbox = {"x": px1, "y": py1, "w": px2 - px1, "h": py2 - py1}
             return resized, bbox, 0.70
 
-    # 3. Live selfie fallback: Center crop
-    cw = int(w * 0.6)
-    ch = int(h * 0.6)
-    cx1 = (w - cw) // 2
-    cy1 = (h - ch) // 2
-    crop = image[cy1:cy1 + ch, cx1:cx1 + cw]
-    resized = cv2.resize(crop, target_size, interpolation=cv2.INTER_AREA)
-    bbox = {"x": cx1, "y": cy1, "w": cw, "h": ch}
-    return resized, bbox, 0.50
+    # 3. If live selfie and no face detected by YOLO or Haar, report NO face detected
+    return None, None, 0.0
 
 
 def extract_document_faces(

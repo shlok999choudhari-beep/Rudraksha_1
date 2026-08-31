@@ -78,7 +78,41 @@ def verify_identity_and_liveness(
     if doc_crop is None:
         flags.append("DOCUMENT_PHOTO_MISSING: Could not detect or extract face from document image.")
     if live_crop is None:
-        flags.append("LIVE_FACE_MISSING: Could not detect face in live selfie image.")
+        flags.append("LIVE_FACE_MISSING: No live human face detected in camera viewport (subject out of frame).")
+
+    # If live face is missing, immediately fail verification with 0.0 similarity & High Risk
+    if live_crop is None or doc_crop is None:
+        match_result = FaceMatchResult(
+            match_status="MISMATCH",
+            similarity_score=0.0,
+            cosine_distance=1.0,
+            is_match=False,
+            confidence=0.0,
+            details="No live human face detected in camera viewport." if live_crop is None else "No document portrait detected."
+        )
+        liveness_result = LivenessResult(
+            is_live=False,
+            liveness_score=0.0,
+            spoof_type="NO_FACE",
+            confidence=1.0,
+            details="Subject not detected in camera frame."
+        )
+        return FaceVerificationReport(
+            is_verified=False,
+            face_similarity_score=0.0,
+            match_status="MISMATCH",
+            is_live=False,
+            liveness_score=0.0,
+            spoof_type="NO_FACE",
+            face_risk_score=1.0,
+            face_risk_level="HIGH",
+            match_details=match_result,
+            liveness_details=liveness_result,
+            doc_face_crop_base64=encode_image_to_base64(doc_crop) if doc_crop is not None else None,
+            live_face_crop_base64=None,
+            tampering_flags=flags,
+            recommendation="Verification Failed: Subject out of frame. Please ensure the applicant is positioned clearly in front of the camera."
+        )
 
     # 2. 1:1 Similarity Matching
     match_result = verify_face_match(doc_crop, live_crop)
@@ -88,25 +122,20 @@ def verify_identity_and_liveness(
         flags.append(f"FACE_SIMILARITY_BORDERLINE: Moderate similarity ({match_result.similarity_score:.1%}), manual review recommended.")
 
     # 3. Passive Liveness Assessment on live selfie
-    liveness_result = evaluate_passive_liveness(live_crop if live_crop is not None else live_image)
+    liveness_result = evaluate_passive_liveness(live_crop)
     if not liveness_result.is_live:
         flags.append(f"LIVENESS_FAILED_{liveness_result.spoof_type}: {liveness_result.details}")
 
     # 4. Calculate Combined Face Risk Score
-    # Risk is high if face mismatch OR spoof attack detected
     mismatch_risk = 1.0 - match_result.similarity_score
     spoof_risk = 1.0 - liveness_result.liveness_score
 
-    # Weighted risk
     risk_score = round(min(1.0, (mismatch_risk * 0.60) + (spoof_risk * 0.40)), 2)
-
-    # If active spoof detected, boost risk
     if not liveness_result.is_live:
         risk_score = max(risk_score, 0.75)
     if match_result.match_status == "MISMATCH":
         risk_score = max(risk_score, 0.80)
 
-    # 3-tier Risk Level
     if risk_score >= 0.60:
         risk_level = "HIGH"
         recommendation = "Secondary Inspection Required: Identity mismatch or presentation spoof attack detected."
@@ -130,8 +159,8 @@ def verify_identity_and_liveness(
         face_risk_level=risk_level,
         match_details=match_result,
         liveness_details=liveness_result,
-        doc_face_crop_base64=encode_image_to_base64(doc_crop) if doc_crop is not None else None,
-        live_face_crop_base64=encode_image_to_base64(live_crop) if live_crop is not None else None,
+        doc_face_crop_base64=encode_image_to_base64(doc_crop),
+        live_face_crop_base64=encode_image_to_base64(live_crop),
         tampering_flags=flags,
         recommendation=recommendation
     )
