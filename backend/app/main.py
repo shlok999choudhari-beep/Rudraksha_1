@@ -160,6 +160,37 @@ def health_check():
     }
 
 
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc):
+    import traceback
+    traceback.print_exc()
+    return JSONResponse(
+        status_code=500,
+        content={
+            "status": "error",
+            "error_type": str(type(exc).__name__),
+            "error": str(exc),
+            "trace": traceback.format_exc()
+        }
+    )
+
+
+@app.get("/api/v1/debug-ocr")
+def debug_ocr():
+    """Diagnostic endpoint to inspect EasyOCR engine loading status in container."""
+    import traceback
+    try:
+        from backend.app.screening.service import get_ocr_engine
+        engine = get_ocr_engine()
+        return {"status": "ok", "engine_type": str(type(engine))}
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e),
+            "trace": traceback.format_exc()
+        }
+
+
 @app.post("/api/v1/screen")
 async def api_v1_screen_document(
     file: UploadFile = File(..., description="Passport/ID Document Image"),
