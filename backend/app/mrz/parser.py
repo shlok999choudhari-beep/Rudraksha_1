@@ -57,6 +57,16 @@ class MRZParsedResult(BaseModel):
     raw_lines: List[str] = []
 
 
+def normalize_numeric_mrz_str(s: str) -> str:
+    """Normalizes OCR character confusions in strictly numeric positions."""
+    sub_map = {
+        'O': '0', 'o': '0', 'Q': '0', 'D': '0',
+        'I': '1', 'l': '1', '|': '1',
+        'Z': '2', 'S': '5', 's': '5', 'B': '8', 'G': '6'
+    }
+    return "".join([sub_map.get(c, c) for c in s])
+
+
 def sanitize_mrz_line(line: str) -> str:
     """Cleans an MRZ string by stripping whitespace and converting to uppercase."""
     if not line:
@@ -103,18 +113,18 @@ def parse_td3(line1: str, line2: str) -> MRZParsedResult:
     raw_name = l1[5:44]
     surname, given_names, full_name = parse_name_field(raw_name)
 
-    # Line 2 fields
+    # Line 2 fields with numeric disambiguation
     doc_number = l2[0:9].replace('<', '')
-    doc_num_check = l2[9]
+    doc_num_check = normalize_numeric_mrz_str(l2[9])
     nationality = l2[10:13].replace('<', '')
-    raw_dob = l2[13:19]
-    dob_check = l2[19]
+    raw_dob = normalize_numeric_mrz_str(l2[13:19])
+    dob_check = normalize_numeric_mrz_str(l2[19])
     sex = l2[20].replace('<', 'X')
-    raw_expiry = l2[21:27]
-    expiry_check = l2[27]
+    raw_expiry = normalize_numeric_mrz_str(l2[21:27])
+    expiry_check = normalize_numeric_mrz_str(l2[27])
     optional_data = l2[28:42].replace('<', '')
     optional_check = l2[42]
-    composite_check = l2[43]
+    composite_check = normalize_numeric_mrz_str(l2[43])
 
     # Validate Document Number Checksum
     doc_num_data = l2[0:9]

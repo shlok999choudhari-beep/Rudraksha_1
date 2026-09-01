@@ -16,39 +16,21 @@ from backend.app.ocr.cross_validation import VIZDataPayload
 MRZ_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<"
 
 
-def build_ocrb_character_templates(char_h: int = 36, char_w: int = 24) -> Dict[str, np.ndarray]:
+def build_ocrb_character_templates(char_h: int = 32, char_w: int = 24) -> Dict[str, np.ndarray]:
     """
     Generates high-precision normalized glyph templates for each MRZ character (OCR-B).
     """
     templates = {}
-    canvas_size = (char_h + 10, char_w + 10)
-
     for ch in MRZ_CHARS:
-        canvas = np.zeros(canvas_size, dtype=np.uint8)
-        font = cv2.FONT_HERSHEY_SIMPLEX
-        font_scale = 0.95
-        thickness = 2
-        
-        # Center character on canvas
-        text = "<" if ch == "<" else ch
-        (tw, th), baseline = cv2.getTextSize(text, font, font_scale, thickness)
-        tx = max(2, (canvas_size[1] - tw) // 2)
-        ty = max(th + 2, (canvas_size[0] + th) // 2 - 2)
-
-        cv2.putText(canvas, text, (tx, ty), font, font_scale, 255, thickness)
-        
-        # Crop tight character bounding box and resize to standard (char_w, char_h)
-        pts = np.argwhere(canvas > 50)
-        if pts.size > 0:
-            y_min, x_min = pts.min(axis=0)
-            y_max, x_max = pts.max(axis=0)
-            tight_crop = canvas[y_min : y_max + 1, x_min : x_max + 1]
-            resized = cv2.resize(tight_crop, (char_w, char_h), interpolation=cv2.INTER_AREA)
+        c = np.zeros((50, 40), dtype=np.uint8)
+        cv2.putText(c, ch, (5, 38), cv2.FONT_HERSHEY_SIMPLEX, 1.0, 255, 2, cv2.LINE_AA)
+        pts = cv2.findNonZero(c)
+        if pts is None:
+            templates[ch] = np.zeros((char_h, char_w), dtype=np.uint8)
         else:
-            resized = np.zeros((char_h, char_w), dtype=np.uint8)
-
-        templates[ch] = (resized > 100).astype(np.uint8) * 255
-
+            x, y, w, h = cv2.boundingRect(pts)
+            crop = c[y:y+h, x:x+w]
+            templates[ch] = cv2.resize(crop, (char_w, char_h), interpolation=cv2.INTER_AREA)
     return templates
 
 
@@ -63,18 +45,27 @@ def recognize_single_character(char_img: np.ndarray) -> Tuple[str, float]:
     if char_img is None or char_img.size == 0:
         return "<", 0.0
 
-    target_w, target_h = 24, 36
-    resized = cv2.resize(char_img, (target_w, target_h), interpolation=cv2.INTER_AREA)
-    _, bin_char = cv2.threshold(resized, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
+    pts = cv2.findNonZero(char_img)
+    if pts is None or len(pts) < 12:
+        return "<", 0.0
+
+    x, y, w, h = cv2.boundingRect(pts)
+    if w < 2 or h < 5:
+        return "<", 0.0
+
+    # Heuristic for single vertical line 'I'
+    if (h / float(max(1, w))) >= 2.5:
+        return "I", 1.0
+
+    crop = char_img[y:y+h, x:x+w]
+    p_res = cv2.resize(crop, (24, 32), interpolation=cv2.INTER_AREA)
 
     best_char = "<"
     best_score = -1.0
 
     for ch, tmpl in OCR_B_TEMPLATES.items():
-        # Match template correlation
-        res = cv2.matchTemplate(bin_char, tmpl, cv2.TM_CCOEFF_NORMED)
+        res = cv2.matchTemplate(p_res, tmpl, cv2.TM_CCOEFF_NORMED)
         score = float(res[0][0]) if res.size > 0 else 0.0
-
         if score > best_score:
             best_score = score
             best_char = ch
@@ -97,7 +88,7 @@ def extract_mrz_lines_from_image(image: np.ndarray) -> List[str]:
     gray = cv2.cvtColor(mrz_crop, cv2.COLOR_BGR2GRAY) if len(mrz_crop.shape) == 3 else mrz_crop
 
     # Contrast enhance & binarize
-    _, thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY_INV)
+    _, thresh = cv2.threshold(gray, 140, 255, cv2.THRESH_BINARY_INV)
     thresh[:10, :] = 0
     thresh[-10:, :] = 0
 
@@ -121,41 +112,41 @@ def extract_mrz_lines_from_image(image: np.ndarray) -> List[str]:
     if len(valid_lines) < 2:
         return []
 
-    # Target number of characters in TD3 is 44
-    num_chars = 44
     extracted_lines = []
 
     for (ly1, ly2) in valid_lines[-2:]:  # Take the bottom-most 2 lines
-        line_crop = thresh[max(0, ly1 - 2) : min(mrz_h, ly2 + 3), :]
-        line_w = line_crop.shape[1]
+        line_crop = thresh[max(0, ly1 - 3) : min(mrz_h, ly2 + 4), :]
+        num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(line_crop)
 
-        v_proj = np.sum(line_crop > 0, axis=0)
-        active_cols = np.where(v_proj > 0)[0]
+        char_boxes = []
+        for i in range(1, num_labels):
+            bx = stats[i, cv2.CC_STAT_LEFT]
+            by = stats[i, cv2.CC_STAT_TOP]
+            bw = stats[i, cv2.CC_STAT_WIDTH]
+            bh = stats[i, cv2.CC_STAT_HEIGHT]
+            area = stats[i, cv2.CC_STAT_AREA]
+            # Ignore side borders
+            if 15 < bx < (w - 15) and bw >= 2 and bh >= 8 and area >= 12:
+                char_boxes.append((bx, by, bw, bh))
 
-        if active_cols.size == 0:
-            continue
-
-        lx1, lx2 = active_cols[0], active_cols[-1]
-        active_w = lx2 - lx1
-
-        if active_w < (w * 0.3):
-            continue
-
-        slot_w = active_w / float(num_chars)
-        line_str = []
-
-        for i in range(num_chars):
-            cx1 = int(lx1 + i * slot_w)
-            cx2 = int(lx1 + (i + 1) * slot_w)
-            char_patch = line_crop[:, max(0, cx1) : min(line_w, cx2)]
-
-            if char_patch.size > 0 and np.sum(char_patch) > 0:
-                ch, score = recognize_single_character(char_patch)
-                line_str.append(ch)
+        char_boxes.sort(key=lambda b: b[0])
+        # If outer vertical border lines were detected on both edges (46 components)
+        if len(char_boxes) >= 46:
+            char_boxes = char_boxes[1:-1]
+        elif len(char_boxes) == 45:
+            if char_boxes[0][0] < int(w * 0.05):
+                char_boxes = char_boxes[1:]
             else:
-                line_str.append("<")
+                char_boxes = char_boxes[:-1]
 
-        extracted_lines.append("".join(line_str))
+        line_chars = []
+        for bx, by, bw, bh in char_boxes:
+            c_patch = line_crop[by : by + bh, bx : bx + bw]
+            ch, _ = recognize_single_character(c_patch)
+            line_chars.append(ch)
+
+        if line_chars:
+            extracted_lines.append("".join(line_chars))
 
     return extracted_lines
 
