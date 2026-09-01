@@ -5,7 +5,7 @@ prior to OCR and MRZ extraction.
 """
 import cv2
 import numpy as np
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Dict, Any
 
 
 def estimate_skew_angle(image: np.ndarray) -> float:
