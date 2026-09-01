@@ -32,9 +32,9 @@ class CopyMoveResult(BaseModel):
 
 def detect_copy_move_clones(
     image: np.ndarray,
-    min_match_count: int = 8,
-    min_spatial_distance: float = 65.0,
-    min_cluster_area: int = 1500
+    min_match_count: int = 5,
+    min_spatial_distance: float = 45.0,
+    min_cluster_area: int = 500
 ) -> Tuple[List[ClonedRegionPair], np.ndarray]:
     """
     Detects duplicated / cloned visual regions via ORB feature matching and displacement clustering.
@@ -50,11 +50,11 @@ def detect_copy_move_clones(
 
     # 1. Create mask to exclude MRZ region (lower 25%) to avoid repeating '<' character false positives
     mask = np.ones((h, w), dtype=np.uint8) * 255
-    mrz_top = int(h * 0.73)
+    mrz_top = int(h * 0.72)
     mask[mrz_top:h, :] = 0
 
     # 2. Extract ORB keypoints outside MRZ
-    orb = cv2.ORB_create(nfeatures=1200, scaleFactor=1.2, nlevels=6)
+    orb = cv2.ORB_create(nfeatures=1800, scaleFactor=1.2, nlevels=8)
     keypoints, descriptors = orb.detectAndCompute(gray, mask=mask)
 
     if descriptors is None or len(keypoints) < 15:
@@ -64,15 +64,15 @@ def detect_copy_move_clones(
     bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=False)
     matches = bf.knnMatch(descriptors, descriptors, k=3)
 
-    # 4. Filter matches: ignore self-match (idx 0), apply strict ratio test on second match
+    # 4. Filter matches: ignore self-match (idx 0), apply ratio test on second match
     good_pairs = []
     for m_list in matches:
         if len(m_list) >= 3:
             m1 = m_list[1]
             m2 = m_list[2]
             
-            # Strict ratio test
-            if m1.distance < 0.62 * m2.distance:
+            # Ratio test
+            if m1.distance < 0.72 * m2.distance:
                 pt1 = keypoints[m1.queryIdx].pt
                 pt2 = keypoints[m1.trainIdx].pt
 
@@ -87,7 +87,7 @@ def detect_copy_move_clones(
 
     # 5. Group matches by displacement vector (dx, dy)
     vector_clusters: Dict[Tuple[int, int], List[Tuple[Tuple[float, float], Tuple[float, float]]]] = {}
-    bin_size = 35
+    bin_size = 40
 
     for pt1, pt2, (dx, dy) in good_pairs:
         if dx < 0 or (dx == 0 and dy < 0):
@@ -111,7 +111,7 @@ def detect_copy_move_clones(
             std_src_x = float(np.std(pts_src[:, 0]))
             std_src_y = float(np.std(pts_src[:, 1]))
 
-            if std_src_x >= 12.0 and std_src_y >= 12.0:
+            if std_src_x >= 6.0 and std_src_y >= 6.0:
                 sx, sy, sw, sh = cv2.boundingRect(pts_src.astype(np.int32))
                 tx, ty, tw, th = cv2.boundingRect(pts_dst.astype(np.int32))
 
