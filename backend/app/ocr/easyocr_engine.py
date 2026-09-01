@@ -25,7 +25,7 @@ class EasyOCREngine:
             verbose=False,
             quantize=False,
             model_storage_directory=MODEL_STORAGE_DIR,
-            download_enabled=True
+            download_enabled=False
         )
 
     def read(self, image):
