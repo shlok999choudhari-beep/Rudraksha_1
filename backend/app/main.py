@@ -109,6 +109,18 @@ app.mount("/static/synthetic", StaticFiles(directory="data/synthetic"), name="sy
 app.mount("/static/captures", StaticFiles(directory="data/captures"), name="captures_data")
 
 
+@app.on_event("startup")
+async def startup_event():
+    """Pre-warms the singleton EasyOCR engine so screening requests execute instantly."""
+    import asyncio
+    try:
+        from backend.app.screening.service import get_ocr_engine
+        await asyncio.to_thread(get_ocr_engine)
+        print("[VeriGuard] EasyOCR singleton engine initialized successfully.")
+    except Exception as e:
+        print(f"[VeriGuard] Warning during startup initialization: {e}")
+
+
 # Request/Response DTOs
 class MRZParseRequest(BaseModel):
     mrz_text: Optional[str] = None

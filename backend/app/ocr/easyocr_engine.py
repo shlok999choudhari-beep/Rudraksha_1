@@ -10,14 +10,11 @@ os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
 os.environ["NUMEXPR_NUM_THREADS"] = "1"
 os.environ["TORCH_NUM_THREADS"] = "1"
 
-try:
-    import torch
-    torch.set_num_threads(1)
-    torch.set_grad_enabled(False)
-except Exception:
-    pass
-
 import easyocr
+
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+MODEL_STORAGE_DIR = os.path.join(BASE_DIR, "models", "easyocr")
+os.makedirs(MODEL_STORAGE_DIR, exist_ok=True)
 
 
 class EasyOCREngine:
@@ -26,7 +23,9 @@ class EasyOCREngine:
             ["en"],
             gpu=False,
             verbose=False,
-            quantize=False
+            quantize=False,
+            model_storage_directory=MODEL_STORAGE_DIR,
+            download_enabled=True
         )
 
     def read(self, image):
