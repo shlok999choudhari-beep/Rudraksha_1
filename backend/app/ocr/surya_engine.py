@@ -42,165 +42,95 @@ class OCRDocumentLayoutResult(BaseModel):
 
 
 class SuryaOCREngine:
-    """Multi-Backend Neural & Layout OCR Document Processor (EasyOCR / Surya / PyTesseract)."""
+    """Clean EasyOCR Document Processor."""
 
     def __init__(self, use_gpu: bool = False):
         self.use_gpu = use_gpu
         self._easyocr_reader = None
-        self._surya_loaded = False
 
-    def _get_easyocr_reader(self):
+    def _get_reader(self):
         if self._easyocr_reader is None:
             try:
                 import torch
                 import easyocr
                 torch.set_num_threads(2)
                 self._easyocr_reader = easyocr.Reader(['en'], gpu=False, verbose=False)
-            except Exception:
+            except Exception as e:
+                print(f"[OCR] EasyOCR init error: {e}")
                 self._easyocr_reader = False
         return self._easyocr_reader if self._easyocr_reader is not False else None
 
-    def _try_load_surya(self):
-        if not self._surya_loaded:
-            try:
-                from surya.ocr import run_ocr
-                from surya.model.detection.model import load_model as load_det_model, load_processor as load_det_proc
-                from surya.model.recognition.model import load_model as load_rec_model, load_processor as load_rec_proc
-                self.run_ocr_fn = run_ocr
-                self.det_model = load_det_model()
-                self.det_processor = load_det_proc()
-                self.rec_model = load_rec_model()
-                self.rec_processor = load_rec_proc()
-                self._surya_loaded = True
-            except Exception:
-                self._surya_loaded = False
-        return self._surya_loaded
-
     def detect_and_read_text(self, image: np.ndarray) -> OCRDocumentLayoutResult:
         """
-        Executes OCR line detection and field extraction across normalized document canvas.
+        Runs EasyOCR on image canvas and outputs text lines with bounding boxes.
         """
         if image is None or image.size == 0:
             return OCRDocumentLayoutResult(
                 raw_text="",
                 text_lines=[],
                 viz_data=VIZDataPayload(),
-                engine_name="None"
+                engine_name="EasyOCR Engine"
             )
 
         text_lines: List[TextLineBBox] = []
         raw_lines: List[str] = []
-        engine_name = "Tesseract & Layout Engine"
+        mrz_candidate_lines: List[str] = []
+        engine_name = "EasyOCR Engine"
 
-        # 1. PyTesseract Native Word & Box OCR Inference
-        try:
-            import pytesseract
-            data = pytesseract.image_to_data(image, output_type=pytesseract.Output.DICT, timeout=6)
-            n_boxes = len(data.get('text', []))
-            for i in range(n_boxes):
-                t = data['text'][i].strip()
-                conf_val = float(data['conf'][i]) if data['conf'][i] != '-1' else 0.0
-                if t and len(t) > 0 and conf_val > 15:
-                    bx = int(data['left'][i])
-                    by = int(data['top'][i])
-                    bw = int(data['width'][i])
-                    bh = int(data['height'][i])
+        reader = self._get_reader()
+        if reader is not None:
+            try:
+                results = reader.readtext(image)
+                h, w = image.shape[:2]
+                mrz_y_threshold = int(h * 0.70)
+
+                for bbox, text, conf in results:
+                    t = text.strip()
+                    if not t or float(conf) < 0.15:
+                        continue
+
+                    pts = np.array(bbox, dtype=np.int32)
+                    bx = int(np.min(pts[:, 0]))
+                    by = int(np.min(pts[:, 1]))
+                    bw = int(np.max(pts[:, 0]) - bx)
+                    bh = int(np.max(pts[:, 1]) - by)
+
                     text_lines.append(TextLineBBox(
                         text=t,
-                        confidence=round(conf_val / 100.0, 2),
+                        confidence=round(float(conf), 2),
                         bbox={"x": bx, "y": by, "w": bw, "h": bh},
-                        polygon=[[bx, by], [bx + bw, by], [bx + bw, by + bh], [bx, by + bh]]
+                        polygon=pts.tolist()
                     ))
                     raw_lines.append(t)
-        except Exception:
-            pass
 
-        # 2. Native Spatial Text Line Detection if PyTesseract not available
-        if not text_lines:
-            try:
-                gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if len(image.shape) == 3 else image
-                rect_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (18, 5))
-                grad = cv2.morphologyEx(gray, cv2.MORPH_GRADIENT, rect_kernel)
-                _, thresh = cv2.threshold(grad, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
-                close_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (25, 7))
-                closed = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, close_kernel)
-                contours, _ = cv2.findContours(closed, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-                
-                detected_boxes = []
-                for cnt in contours:
-                    bx, by, bw, bh = cv2.boundingRect(cnt)
-                    if bw > 30 and bh > 8 and (bw * bh) > 300:
-                        detected_boxes.append((by, bx, bw, bh))
-                
-                detected_boxes.sort(key=lambda b: (b[0], b[1]))
-                for by, bx, bw, bh in detected_boxes:
-                    text_lines.append(TextLineBBox(
-                        text="DOCUMENT_FIELD",
-                        confidence=0.98,
-                        bbox={"x": bx, "y": by, "w": bw, "h": bh},
-                        polygon=[[bx, by], [bx + bw, by], [bx + bw, by + bh], [bx, by + bh]]
-                    ))
-            except Exception:
-                pass
+                    # Check if line belongs in bottom MRZ band
+                    if by >= mrz_y_threshold:
+                        cleaned = re.sub(r'[\r\n\t ]+', '', t).upper()
+                        if len(cleaned) >= 20:
+                            mrz_candidate_lines.append(cleaned)
+            except Exception as e:
+                print(f"[OCR] EasyOCR execution failed: {e}")
 
-        # 2. Native Spatial Text Line Detection if PyTesseract not available
-        if not text_lines:
-            try:
-                gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if len(image.shape) == 3 else image
-                rect_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (18, 5))
-                grad = cv2.morphologyEx(gray, cv2.MORPH_GRADIENT, rect_kernel)
-                _, thresh = cv2.threshold(grad, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
-                close_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (25, 7))
-                closed = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, close_kernel)
-                contours, _ = cv2.findContours(closed, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-                
-                detected_boxes = []
-                for cnt in contours:
-                    bx, by, bw, bh = cv2.boundingRect(cnt)
-                    if bw > 30 and bh > 8 and (bw * bh) > 300:
-                        detected_boxes.append((by, bx, bw, bh))
-                
-                detected_boxes.sort(key=lambda b: (b[0], b[1]))
-                for by, bx, bw, bh in detected_boxes:
-                    text_lines.append(TextLineBBox(
-                        text="DOCUMENT_FIELD",
-                        confidence=0.98,
-                        bbox={"x": bx, "y": by, "w": bw, "h": bh},
-                        polygon=[[bx, by], [bx + bw, by], [bx + bw, by + bh], [bx, by + bh]]
-                    ))
-            except Exception:
-                pass
-
-        # 3. High-Precision MRZ Extraction & Parsing
-        mrz_candidate_lines = []
+        # Parse MRZ lines if found in bottom zone
         mrz_parsed = None
-        try:
-            from backend.app.mrz.extractor import extract_and_parse_mrz_from_image
-            mrz_res = extract_and_parse_mrz_from_image(image)
-            if mrz_res.mrz_lines:
-                mrz_candidate_lines = mrz_res.mrz_lines
-            if mrz_res.parsed_data:
-                mrz_parsed = mrz_res.parsed_data
-        except Exception:
-            pass
-
-        if not mrz_parsed and mrz_candidate_lines and len(mrz_candidate_lines) >= 2:
+        if len(mrz_candidate_lines) >= 2:
             try:
-                mrz_parsed = parse_mrz(mrz_candidate_lines)
+                mrz_parsed = parse_mrz(mrz_candidate_lines[-2:])
             except Exception:
                 pass
 
-        # 4. Extract / Derive VIZ Data Payload dynamically
+        # Synthesize VIZ Data
         viz_data = self._extract_viz_from_lines_and_mrz(text_lines, mrz_parsed)
 
         return OCRDocumentLayoutResult(
-            raw_text="\n".join(raw_lines) if raw_lines else "\n".join(mrz_candidate_lines),
+            raw_text="\n".join(raw_lines),
             text_lines=text_lines,
             viz_data=viz_data,
             detected_mrz_lines=mrz_candidate_lines,
             mrz_parsed_result=mrz_parsed,
             engine_name=engine_name
         )
+
 
     def _extract_viz_from_lines_and_mrz(
         self,
