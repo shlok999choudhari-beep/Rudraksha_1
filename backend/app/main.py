@@ -143,22 +143,59 @@ def root():
 
 
 @app.get("/health")
+@app.get("/api/v1/health")
 def health_check():
-    """Health check endpoint to verify backend operational status."""
+    """Health check endpoint to verify backend operational status for Railway liveness."""
     return {
-        "status": "ok",
+        "status": "healthy",
         "service": "veriguard-ai",
+        "version": "1.0.0",
         "components": {
             "api": "healthy",
-            "preprocessing": "operational",
-            "geometry_engine": "operational",
-            "mrz_engine": "operational",
-            "ocr_cross_validation": "operational",
-            "tamper_forensics": "operational",
-            "face_verification": "operational",
-            "master_risk_engine": "operational"
+            "ocr_engine": "easyocr_cpu_singleton",
+            "mrz_engine": "icao_doc_9303_modulo10",
+            "tamper_forensics": "ela_noise_clone_active",
+            "risk_engine": "4_layer_explainable_active"
         }
     }
+
+
+@app.post("/api/v1/screen")
+async def api_v1_screen_document(
+    file: UploadFile = File(..., description="Passport/ID Document Image"),
+    selfie: Optional[UploadFile] = File(None, description="Optional live selfie camera photo")
+):
+    """
+    Production Document Screening Endpoint.
+    Executes full quality gating, auto-deskew, EasyOCR, VIZ, MRZ, Forensics, and 360° Explainable Risk Scoring.
+    """
+    from backend.app.screening.service import screen_document
+
+    # 1. Read document bytes
+    doc_bytes = await file.read()
+    if not doc_bytes:
+        raise HTTPException(status_code=400, detail="Empty document file uploaded.")
+
+    # Decode image with OpenCV
+    nparr = np.frombuffer(doc_bytes, np.uint8)
+    doc_img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    if doc_img is None:
+        raise HTTPException(status_code=400, detail="Could not decode document image. Supported formats: JPEG, PNG, WEBP.")
+
+    # 2. Read optional selfie bytes
+    selfie_img = None
+    if selfie is not None:
+        selfie_bytes = await selfie.read()
+        if selfie_bytes:
+            selfie_nparr = np.frombuffer(selfie_bytes, np.uint8)
+            selfie_img = cv2.imdecode(selfie_nparr, cv2.IMREAD_COLOR)
+
+    # 3. Execute master screening pipeline
+    try:
+        result = screen_document(doc_img, selfie_image=selfie_img)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Screening pipeline error: {str(e)}")
 
 
 # =========================================================================

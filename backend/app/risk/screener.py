@@ -96,21 +96,43 @@ def screen_document_and_identity(
     geom_report = evaluate_passport_geometry(normalized_canvas)
 
     # -------------------------------------------------------------------------
-    # Stage 3: Surya OCR & Document Layout Recognition
+    # Stage 3: EasyOCR Full Canvas + VIZ Extraction + MRZ Reconstruction
     # -------------------------------------------------------------------------
-    try:
-        ocr_res = surya_engine.detect_and_read_text(normalized_canvas)
-        mrz_parsed = ocr_res.mrz_parsed_result
-    except Exception:
-        from backend.app.mrz.extractor import extract_and_parse_mrz_from_image
-        from backend.app.ocr.cross_validation import VIZDataPayload
-        mrz_parsed = extract_and_parse_mrz_from_image(normalized_canvas)
-        ocr_res = OCRDocumentLayoutResult(
-            raw_text="",
-            text_lines=[],
-            viz_data=VIZDataPayload(),
-            mrz_parsed_result=mrz_parsed
-        )
+    from backend.app.ocr.viz_extractor import extract_viz_fields_from_ocr
+    from backend.app.mrz.reconstruct import reconstruct_mrz_from_detections, normalize_mrz_td3
+    from backend.app.mrz.parser import parse_mrz
+    from backend.app.ocr.cross_validation import VIZDataPayload
+    from backend.app.screening.service import get_ocr_engine
+
+    ocr = get_ocr_engine()
+    all_boxes = ocr.read(normalized_canvas)
+    viz_fields = extract_viz_fields_from_ocr(all_boxes, normalized_canvas.shape)
+
+    h_norm = normalized_canvas.shape[0]
+    mrz_boxes = [
+        b for b in all_boxes
+        if min(p[1] for p in b["bbox"]) >= int(h_norm * 0.68)
+    ]
+    raw_l1, raw_l2 = reconstruct_mrz_from_detections(mrz_boxes)
+    norm_l1, norm_l2 = normalize_mrz_td3(raw_l1, raw_l2)
+    mrz_parsed = parse_mrz([norm_l1, norm_l2])
+
+    viz_payload = VIZDataPayload(
+        document_number=viz_fields.document_number,
+        surname=viz_fields.surname,
+        given_names=viz_fields.given_names,
+        nationality=viz_fields.nationality,
+        date_of_birth=viz_fields.date_of_birth,
+        date_of_expiry=viz_fields.date_of_expiry,
+        sex=viz_fields.sex
+    )
+
+    ocr_res = OCRDocumentLayoutResult(
+        raw_text=" ".join(b["text"] for b in all_boxes),
+        text_lines=[],
+        viz_data=viz_payload,
+        mrz_parsed_result=mrz_parsed
+    )
 
     # -------------------------------------------------------------------------
     # Stage 4: VIZ <-> MRZ Cross-Validation
