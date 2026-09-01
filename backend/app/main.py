@@ -190,12 +190,22 @@ async def api_v1_screen_document(
             selfie_nparr = np.frombuffer(selfie_bytes, np.uint8)
             selfie_img = cv2.imdecode(selfie_nparr, cv2.IMREAD_COLOR)
 
-    # 3. Execute master screening pipeline
+    # 3. Execute master screening pipeline asynchronously in threadpool
+    import asyncio
+    import traceback
     try:
-        result = screen_document(doc_img, selfie_image=selfie_img)
+        result = await asyncio.to_thread(screen_document, doc_img, None, selfie_img)
         return result
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Screening pipeline error: {str(e)}")
+        traceback.print_exc()
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "error",
+                "error": str(e),
+                "trace": traceback.format_exc()
+            }
+        )
 
 
 # =========================================================================
