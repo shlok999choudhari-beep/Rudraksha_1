@@ -88,6 +88,13 @@ def seed_database(db: Session = None):
                 )
                 db.add(new_user)
 
+        db.flush()
+
+        officer = db.query(User).filter(User.email == "officer@veriguard.gov").first()
+        supervisor = db.query(User).filter(User.email == "supervisor@veriguard.gov").first()
+        officer_id = officer.id if officer else "usr-officer-01"
+        supervisor_id = supervisor.id if supervisor else "usr-supervisor-01"
+
         # 2. Seed Watchlist Items
         watchlist_seeds = [
             {
@@ -141,8 +148,8 @@ def seed_database(db: Session = None):
                 "overall_trust_score": 93.5,
                 "decision": "APPROVED_FOR_CLEARANCE",
                 "processing_time_ms": 342.0,
-                "created_by_id": "usr-officer-01",
-                "reviewed_by_id": "usr-officer-01",
+                "created_by_id": officer_id,
+                "reviewed_by_id": officer_id,
                 "review_decision": "APPROVED",
                 "review_notes": "All ICAO check digits matched. No visual or noise tampering detected.",
                 "created_at": datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=4),
@@ -171,8 +178,8 @@ def seed_database(db: Session = None):
                 "overall_trust_score": 12.0,
                 "decision": "SECONDARY_INSPECTION_REQUIRED",
                 "processing_time_ms": 410.0,
-                "created_by_id": "usr-officer-01",
-                "reviewed_by_id": "usr-supervisor-01",
+                "created_by_id": officer_id,
+                "reviewed_by_id": supervisor_id,
                 "review_decision": "ESCALATED",
                 "review_notes": "DOB and Doc Number altered in Visual Inspection Zone. Severe ELA recompression anomaly detected on portrait photo.",
                 "created_at": datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=2),

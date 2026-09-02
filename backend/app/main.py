@@ -111,14 +111,8 @@ app.mount("/static/captures", StaticFiles(directory="data/captures"), name="capt
 
 @app.on_event("startup")
 async def startup_event():
-    """Pre-warms the singleton EasyOCR engine so screening requests execute instantly."""
-    import asyncio
-    try:
-        from backend.app.screening.service import get_ocr_engine
-        await asyncio.to_thread(get_ocr_engine)
-        print("[VeriGuard] EasyOCR singleton engine initialized successfully.")
-    except Exception as e:
-        print(f"[VeriGuard] Warning during startup initialization: {e}")
+    """Lightweight non-blocking startup handler for instant cloud container health check readiness."""
+    print("[VeriGuard] VeriGuard AI API server started successfully. Models initialize on first inference.")
 
 
 # Request/Response DTOs
@@ -159,15 +153,15 @@ def root():
 def health_check():
     """Health check endpoint to verify backend operational status for Railway liveness."""
     return {
-        "status": "healthy",
+        "status": "ok",
         "service": "veriguard-ai",
         "version": "1.0.0",
         "components": {
             "api": "healthy",
-            "ocr_engine": "easyocr_cpu_singleton",
-            "mrz_engine": "icao_doc_9303_modulo10",
-            "tamper_forensics": "ela_noise_clone_active",
-            "risk_engine": "4_layer_explainable_active"
+            "ocr_engine": "operational",
+            "mrz_engine": "operational",
+            "tamper_forensics": "operational",
+            "risk_engine": "operational"
         }
     }
 

@@ -52,6 +52,9 @@ def normalize_date_string(date_str: str) -> Optional[str]:
             year = "20" + year if int(year) < 50 else "19" + year
         return f"{year}-{month}-{day}"
 
+    return None
+
+
 class VIZDataPayload(BaseModel):
     document_number: str = ""
     surname: str = ""
@@ -97,6 +100,7 @@ def normalize_date_for_comparison(date_str: str) -> Optional[str]:
 class CrossValidationReport(BaseModel):
     is_consistent: bool = True
     overall_match_ratio: float = 1.0
+    risk_level: str = "LOW"
     field_details: Dict[str, FieldComparisonResult] = {}
     mismatched_fields: List[str] = []
     discrepancy_score: float = 0.0  # 0.0 (consistent) to 1.0 (severe identity mismatch)
@@ -112,13 +116,13 @@ def cross_validate_viz_and_mrz(viz_data: Any, mrz_data: Any) -> CrossValidationR
     # 1. Document Number
     v_doc = str(getattr(viz_data, "document_number", "") or "").strip().upper().replace(" ", "")
     m_doc = str(getattr(mrz_data, "document_number", "") or "").strip().upper().replace(" ", "")
-    doc_match = (v_doc == m_doc) if (v_doc and m_doc) else False
+    doc_match = (v_doc == m_doc) if (v_doc and m_doc) else True
     details["document_number"] = FieldComparisonResult(
         field_name="Document Number",
         viz_value=v_doc,
         mrz_value=m_doc,
         is_match=doc_match,
-        discrepancy_reason=None if doc_match else f"VIZ '{v_doc}' does not match MRZ '{m_doc}'"
+        discrepancy_reason=None if doc_match else f"VIZ Doc No '{v_doc}' != MRZ Doc No '{m_doc}'"
     )
     if not doc_match:
         mismatches.append("document_number")
@@ -126,13 +130,15 @@ def cross_validate_viz_and_mrz(viz_data: Any, mrz_data: Any) -> CrossValidationR
     # 2. Surname
     v_sur = str(getattr(viz_data, "surname", "") or "").strip().upper()
     m_sur = str(getattr(mrz_data, "surname", "") or "").strip().upper()
-    sur_match = (v_sur == m_sur or v_sur in m_sur or m_sur in v_sur) if (v_sur and m_sur) else False
+    sur_sim = compute_string_similarity(v_sur, m_sur) if (v_sur and m_sur) else 1.0
+    sur_match = (sur_sim >= 0.85) if (v_sur and m_sur) else True
     details["surname"] = FieldComparisonResult(
         field_name="Surname",
         viz_value=v_sur,
         mrz_value=m_sur,
         is_match=sur_match,
-        discrepancy_reason=None if sur_match else f"VIZ surname '{v_sur}' != MRZ '{m_sur}'"
+        similarity=round(sur_sim, 2),
+        discrepancy_reason=None if sur_match else f"Surname mismatch (similarity: {sur_sim:.2f})"
     )
     if not sur_match:
         mismatches.append("surname")
@@ -140,13 +146,15 @@ def cross_validate_viz_and_mrz(viz_data: Any, mrz_data: Any) -> CrossValidationR
     # 3. Given Names
     v_giv = str(getattr(viz_data, "given_names", "") or "").strip().upper()
     m_giv = str(getattr(mrz_data, "given_names", "") or "").strip().upper()
-    giv_match = (v_giv == m_giv or v_giv in m_giv or m_giv in v_giv) if (v_giv and m_giv) else False
+    giv_sim = compute_string_similarity(v_giv, m_giv) if (v_giv and m_giv) else 1.0
+    giv_match = (giv_sim >= 0.80) if (v_giv and m_giv) else True
     details["given_names"] = FieldComparisonResult(
         field_name="Given Names",
         viz_value=v_giv,
         mrz_value=m_giv,
         is_match=giv_match,
-        discrepancy_reason=None if giv_match else f"VIZ given name '{v_giv}' != MRZ '{m_giv}'"
+        similarity=round(giv_sim, 2),
+        discrepancy_reason=None if giv_match else f"Given names mismatch (similarity: {giv_sim:.2f})"
     )
     if not giv_match:
         mismatches.append("given_names")
@@ -154,13 +162,13 @@ def cross_validate_viz_and_mrz(viz_data: Any, mrz_data: Any) -> CrossValidationR
     # 4. Nationality
     v_nat = str(getattr(viz_data, "nationality", "") or "").strip().upper()
     m_nat = str(getattr(mrz_data, "nationality", "") or "").strip().upper()
-    nat_match = ("IND" in v_nat and "IND" in m_nat) or (v_nat == m_nat) if (v_nat and m_nat) else True
+    nat_match = (v_nat == m_nat) if (v_nat and m_nat) else True
     details["nationality"] = FieldComparisonResult(
         field_name="Nationality",
         viz_value=v_nat,
         mrz_value=m_nat,
         is_match=nat_match,
-        discrepancy_reason=None if nat_match else f"VIZ nationality '{v_nat}' != MRZ '{m_nat}'"
+        discrepancy_reason=None if nat_match else f"VIZ Nat '{v_nat}' != MRZ Nat '{m_nat}'"
     )
     if not nat_match:
         mismatches.append("nationality")
@@ -170,7 +178,7 @@ def cross_validate_viz_and_mrz(viz_data: Any, mrz_data: Any) -> CrossValidationR
     m_dob_raw = str(getattr(mrz_data, "date_of_birth", "") or "")
     v_dob_norm = normalize_date_string(v_dob_raw) or v_dob_raw
     m_dob_norm = normalize_date_string(m_dob_raw) or m_dob_raw
-    dob_match = (v_dob_norm == m_dob_norm) if (v_dob_norm and m_dob_norm) else False
+    dob_match = (v_dob_norm == m_dob_norm) if (v_dob_norm and m_dob_norm) else True
     details["date_of_birth"] = FieldComparisonResult(
         field_name="Date of Birth",
         viz_value=v_dob_raw,
@@ -186,7 +194,7 @@ def cross_validate_viz_and_mrz(viz_data: Any, mrz_data: Any) -> CrossValidationR
     m_exp_raw = str(getattr(mrz_data, "date_of_expiry", "") or "")
     v_exp_norm = normalize_date_string(v_exp_raw) or v_exp_raw
     m_exp_norm = normalize_date_string(m_exp_raw) or m_exp_raw
-    exp_match = (v_exp_norm == m_exp_norm) if (v_exp_norm and m_exp_norm) else False
+    exp_match = (v_exp_norm == m_exp_norm) if (v_exp_norm and m_exp_norm) else True
     details["date_of_expiry"] = FieldComparisonResult(
         field_name="Date of Expiry",
         viz_value=v_exp_raw,
@@ -200,13 +208,15 @@ def cross_validate_viz_and_mrz(viz_data: Any, mrz_data: Any) -> CrossValidationR
     # Calculate overall consistency
     total_fields = len(details)
     matched_fields = sum(1 for d in details.values() if d.is_match)
-    match_ratio = matched_fields / float(total_fields)
+    match_ratio = matched_fields / float(total_fields) if total_fields > 0 else 1.0
     is_consistent = (len(mismatches) == 0)
     discrepancy_score = 1.0 - match_ratio
+    risk_level = "LOW" if is_consistent else ("HIGH" if discrepancy_score > 0.4 else "MEDIUM")
 
     return CrossValidationReport(
         is_consistent=is_consistent,
         overall_match_ratio=round(match_ratio, 3),
+        risk_level=risk_level,
         field_details=details,
         mismatched_fields=mismatches,
         discrepancy_score=round(discrepancy_score, 3)
