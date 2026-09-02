@@ -30,6 +30,16 @@ export function TamperAnalysis({
   const isHighTamper = overallScore >= 60;
   const isMediumTamper = overallScore >= 30 && overallScore < 60;
 
+  const defaultSpecimen = isHighTamper
+    ? '/specimens/tampered_specimen_forged_passport.jpg'
+    : '/specimens/genuine_specimen_ananya_sharma.jpg';
+
+  const [imgSrc, setImgSrc] = useState<string>(documentImageUrl || defaultSpecimen);
+
+  React.useEffect(() => {
+    setImgSrc(documentImageUrl || defaultSpecimen);
+  }, [documentImageUrl, defaultSpecimen]);
+
   return (
     <div className={cn('panel p-5 space-y-5', className)}>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -51,12 +61,12 @@ export function TamperAnalysis({
               {isHighTamper ? (
                 <>
                   <ShieldAlert className="size-3" />
-                  MANIPULATION DETECTED
+                  TAMPERING DETECTED
                 </>
               ) : isMediumTamper ? (
                 <>
                   <AlertTriangle className="size-3" />
-                  SUSPICIOUS ANOMALY
+                  SUSPICIOUS ARTIFACTS
                 </>
               ) : (
                 <>
@@ -99,12 +109,13 @@ export function TamperAnalysis({
         {/* Document Image with Forensic Bounding Box Overlays */}
         <div className="lg:col-span-7 flex flex-col justify-center">
           <div className="relative group rounded-xl border border-border bg-black/60 overflow-hidden flex items-center justify-center min-h-[260px] max-h-[360px]">
-            {documentImageUrl ? (
+            {imgSrc ? (
               <div className="relative max-h-full max-w-full">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={documentImageUrl}
+                  src={imgSrc}
                   alt="Forensic Document Inspection"
+                  onError={() => setImgSrc(defaultSpecimen)}
                   className="max-h-[340px] w-auto object-contain rounded"
                 />
 

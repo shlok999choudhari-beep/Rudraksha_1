@@ -1,5 +1,6 @@
 import {
   ClipboardList,
+  FileDown,
   FileSearch,
   LayoutDashboard,
   ScanLine,
@@ -55,6 +56,13 @@ export const NAV_SECTIONS: NavSection[] = [
         icon: ScanLine,
         permissions: ['screening:create'],
         emphasis: true,
+      },
+      {
+        href: '/demo-docs',
+        label: 'Demo Docs',
+        hint: 'Download test specimens',
+        icon: FileDown,
+        permissions: ['screening:view'],
       },
       {
         href: '/screening',

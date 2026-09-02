@@ -176,7 +176,27 @@ function SignInPanel() {
           </Alert>
         )}
 
-        <form onSubmit={onSubmit} className="mt-6 space-y-4">
+        {/* Quick 1-Click Demo Login for Video / Demo */}
+        <div className="mt-5">
+          <button
+            type="button"
+            onClick={async () => {
+              clearError();
+              try {
+                await signIn({ email: 'officer@veriguard.demo', password: DEMO_PASSWORD });
+                router.replace(destination);
+              } catch (err) {
+                console.error(err);
+              }
+            }}
+            className="w-full flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold text-sm shadow-md shadow-emerald-900/30 transition-all duration-200 cursor-pointer active:scale-[0.99] border border-emerald-400/30"
+          >
+            <Sparkles className="size-4 animate-pulse text-emerald-200" />
+            <span>🚀 Quick Demo Login (Insp. Priya Sharma)</span>
+          </button>
+        </div>
+
+        <form onSubmit={onSubmit} className="mt-4 space-y-4">
           <Field label="Email" htmlFor="email" required>
             <div className="relative">
               <Mail

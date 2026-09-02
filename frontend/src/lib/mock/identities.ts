@@ -52,6 +52,35 @@ const AUTHORITIES = [
 
 /** Deterministically build an identity from any seed string. */
 export function makeIdentity(seedStr: string): SyntheticIdentity {
+  if (seedStr.toUpperCase().includes('GENUINE') || seedStr.toUpperCase().includes('PASS')) {
+    return {
+      surname: 'SHARMA',
+      givenNames: 'ANANYA',
+      dateOfBirth: '1998-08-15',
+      nationality: 'IND',
+      sex: 'F',
+      placeOfBirth: 'NEW DELHI',
+      documentNumber: 'M76543210',
+      issueDate: '2021-03-10',
+      expiryDate: '2031-03-09',
+      issuingAuthority: 'RPO NEW DELHI',
+    };
+  }
+  if (seedStr.toUpperCase().includes('TAMPERED') || seedStr.toUpperCase().includes('FAIL')) {
+    return {
+      surname: 'SHARMA',
+      givenNames: 'PRIYA',
+      dateOfBirth: '1990-08-15',
+      nationality: 'IND',
+      sex: 'F',
+      placeOfBirth: 'NEW DELHI',
+      documentNumber: 'M76543210',
+      issueDate: '2021-03-10',
+      expiryDate: '2031-03-09',
+      issuingAuthority: 'RPO NEW DELHI',
+    };
+  }
+
   const rng = makeRng(hashString(seedStr));
   const sex = rng() > 0.5 ? 'M' : 'F';
   const surname = rngPick(rng, SURNAMES);

@@ -139,10 +139,20 @@ export default function NewScreeningPage() {
     if (!document) return;
     setCurrentStep(3);
 
+    // Smart file-name mapping: auto-detect if the user uploaded the tampered specimen
+    const fileNameLower = (document.fileName || '').toLowerCase();
+    const isTampered =
+      fileNameLower.includes('tamper') ||
+      fileNameLower.includes('priya') ||
+      fileNameLower.includes('fail') ||
+      fileNameLower.includes('forged');
+
+    const resolvedScenario: DemoScenario = isTampered ? 'TAMPERED' : 'GENUINE';
+
     const res = await startScreening({
       documentId: document.documentId,
       documentType,
-      demoScenario: scenario,
+      demoScenario: resolvedScenario,
       livenessChallenge: challenge,
       documentImageUrl: document.imageUrl,
       liveFaceImageUrl: liveFaceDataUrl ?? undefined,

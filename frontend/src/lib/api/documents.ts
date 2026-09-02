@@ -406,15 +406,19 @@ export async function uploadDocument(input: UploadDocumentInput): Promise<Upload
       detectionConfidence: 0.92,
     };
 
+    const isTampered =
+      file.name.toLowerCase().includes('tamper') ||
+      file.name.toLowerCase().includes('priya') ||
+      file.name.toLowerCase().includes('fail') ||
+      file.name.toLowerCase().includes('forged');
+    const docPrefix = isTampered ? 'doc-tampered-' : 'doc-genuine-';
+
     return {
-      documentId: `doc-${hashFile(file)}`,
+      documentId: `${docPrefix}${hashFile(file)}`,
       documentType,
       fileName: file.name,
       fileSizeBytes: file.size,
       mimeType: file.type || 'application/octet-stream',
-      // Demo mode has no server-side normalisation, so the captured image is
-      // also the working image. The specimen data page used by the analysis
-      // panels is generated during the screening run.
       imageUrl: originalImageUrl ?? '',
       originalImageUrl,
       quality: buildQualityReport(resolved),

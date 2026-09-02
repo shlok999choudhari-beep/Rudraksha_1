@@ -1075,15 +1075,24 @@ async def run_screening_endpoint(payload: RunScreeningRequest):
 
         # Field comparisons for VIZ <-> MRZ Cross-Check
         comparisons = []
-        if report.cross_validation_report and report.cross_validation_report.field_comparisons:
-            for fc in report.cross_validation_report.field_comparisons:
+        if report.cross_validation_report:
+            c_rep = report.cross_validation_report
+            items = getattr(c_rep, "field_comparisons", None) or list(getattr(c_rep, "field_details", {}).values())
+            for fc in items:
+                field_name = getattr(fc, "field_name", "Field")
+                viz_val = getattr(fc, "viz_value", "")
+                mrz_val = getattr(fc, "mrz_value", "")
+                is_m = getattr(fc, "is_match", None)
+                if is_m is None:
+                    is_m = getattr(fc, "match", True)
+                note = getattr(fc, "discrepancy_reason", None) or getattr(fc, "discrepancy_detail", None)
                 comparisons.append({
-                    "key": fc.field_name.lower().replace(" ", "_"),
-                    "label": fc.field_name,
-                    "ocr_value": fc.viz_value,
-                    "mrz_value": fc.mrz_value,
-                    "status": "MATCH" if fc.match else "MISMATCH",
-                    "note": fc.discrepancy_detail,
+                    "key": field_name.lower().replace(" ", "_"),
+                    "label": field_name,
+                    "ocr_value": viz_val,
+                    "mrz_value": mrz_val,
+                    "status": "MATCH" if is_m else "MISMATCH",
+                    "note": note or "",
                 })
 
         # Check digits breakdown

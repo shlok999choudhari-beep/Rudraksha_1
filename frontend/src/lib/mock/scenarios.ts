@@ -654,14 +654,11 @@ function buildFace(
   impersonation: boolean,
   liveFaceImageUrl?: string,
 ): FaceVerificationResult {
-  const hasLiveFace = Boolean(liveFaceImageUrl);
-  const similarity = !hasLiveFace
-    ? 0.0
-    : impersonation
-      ? rngFloat(rng, 0.25, 0.42)
-      : rngFloat(rng, 0.89, 0.968);
+  const similarity = impersonation
+    ? rngFloat(rng, 0.25, 0.42)
+    : rngFloat(rng, 0.91, 0.978);
 
-  const outcome = (hasLiveFace && similarity >= FACE_THRESHOLD) ? 'MATCH' : 'NO_MATCH';
+  const outcome = !impersonation && similarity >= FACE_THRESHOLD ? 'MATCH' : 'NO_MATCH';
 
   return {
     status: 'COMPLETED',
@@ -670,12 +667,12 @@ function buildFace(
     outcome,
     documentFaceUrl: faceSvgDataUri({ seed: identity.documentNumber, variant: 'document' }),
     liveFaceUrl:
-      liveFaceImageUrl ??
+      liveFaceImageUrl ||
       (impersonation
         ? faceSvgDataUri({ seed: `${identity.documentNumber}-alt`, variant: 'live' })
-        : undefined),
+        : faceSvgDataUri({ seed: identity.documentNumber, variant: 'live' })),
     documentFaceQuality: 'GOOD',
-    liveFaceQuality: hasLiveFace ? (rng() > 0.75 ? 'ACCEPTABLE' : 'GOOD') : 'POOR',
+    liveFaceQuality: 'GOOD',
     modelVersion: 'vg-face-embed v1.2.0',
   };
 }

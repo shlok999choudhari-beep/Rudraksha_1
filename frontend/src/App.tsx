@@ -14,6 +14,7 @@ import CaseDetailsPage from '@/app/(app)/cases/[caseId]/page';
 import AnalyticsPage from '@/app/(app)/analytics/page';
 import AuditLogsPage from '@/app/(app)/audit-logs/page';
 import SettingsPage from '@/app/(app)/settings/page';
+import DemoDocsPage from '@/app/(app)/demo-docs/page';
 import OfficerCockpitPage from '@/pages/OfficerCockpitPage';
 
 export function App() {
@@ -68,6 +69,15 @@ export function App() {
                 element={
                   <AuthenticatedLayout>
                     <NewScreeningPage />
+                  </AuthenticatedLayout>
+                }
+              />
+
+              <Route
+                path="/demo-docs"
+                element={
+                  <AuthenticatedLayout>
+                    <DemoDocsPage />
                   </AuthenticatedLayout>
                 }
               />

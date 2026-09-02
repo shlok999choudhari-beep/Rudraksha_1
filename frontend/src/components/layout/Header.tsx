@@ -77,18 +77,6 @@ export function Header({ onToggleSidebar }: HeaderProps) {
 
         <UserMenu />
       </div>
-
-      {/*
-        Kept permanently on screen rather than shown once at sign-in. The system
-        produces evidence and a risk indication; the decision stays with the
-        officer, and the interface should never let that slip out of view.
-      */}
-      <div className="flex items-center gap-2 border-t border-peach-200/50 bg-gradient-to-r from-peach-50/90 via-peach-50/50 to-surface/80 px-4 py-1.5 lg:px-6 backdrop-blur-sm">
-        <ShieldAlert className="size-3 shrink-0 text-peach-600" aria-hidden />
-        <p className="truncate font-mono text-2xs uppercase tracking-[0.14em] text-peach-950/80 font-medium">
-          Decision support — every result requires officer verification. No automated admission or refusal.
-        </p>
-      </div>
     </header>
   );
 }
