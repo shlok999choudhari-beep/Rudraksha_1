@@ -33,17 +33,28 @@ models/*.pth
 models/*.onnx
 models/*.h5
 models/*.safetensors
+models/**/*.zip
 !models/.gitkeep
 
-# Data (Raw / Large Datasets)
+# Data (Raw / Large Datasets / Dynamic Runtime Captures)
 data/raw/
 data/processed/
+data/captures/*
+!data/captures/.gitkeep
 data/*.csv
 data/*.parquet
 data/*.jsonl
 data/*.zip
 data/*.tar.gz
 !data/.gitkeep
+
+# Loose test scripts & test image artifacts
+test_*.jpg
+test_*.png
+test_*.jpeg
+backend/test_*.py
+backend/test_*.jpg
+walkthrough.md
 
 # Logs and outputs
 logs/
@@ -53,4 +64,7 @@ logs/
 *.db
 *.sqlite
 *.sqlite3
+*.zip
+*.tar.gz
+
 

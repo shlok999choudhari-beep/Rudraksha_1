@@ -32,7 +32,7 @@ class CopyMoveResult(BaseModel):
 
 def detect_copy_move_clones(
     image: np.ndarray,
-    min_match_count: int = 5,
+    min_match_count: int = 15,
     min_spatial_distance: float = 45.0,
     min_cluster_area: int = 500
 ) -> Tuple[List[ClonedRegionPair], np.ndarray]:

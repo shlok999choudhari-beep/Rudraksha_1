@@ -49,7 +49,7 @@ class TD3PassportTemplate:
         width=0.936,
         height=0.205,
         aspect_ratio=0.936 / 0.205,
-        tolerance=0.06
+        tolerance=0.15
     )
 
     # Visual Inspection Zone (VIZ) Text Column Offsets

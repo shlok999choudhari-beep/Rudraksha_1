@@ -17,6 +17,7 @@ def generate_synthetic_passport(
     surname: str = "DOE",
     nationality: str = "UTO",  # Utopia
     doc_number: str = "A12345678",
+    viz_doc_number: Optional[str] = None,
     dob: str = "850712",       # 12 Jul 1985
     sex: str = "F",
     expiry: str = "300101",    # 01 Jan 2030
@@ -71,7 +72,7 @@ def generate_synthetic_passport(
     fields = [
         ("Type / Type", "P"),
         ("Country Code / Pays", nationality),
-        ("Passport No. / No. du Passeport", doc_number),
+        ("Passport No. / No. du Passeport", viz_doc_number or doc_number),
         ("Surname / Nom", surname),
         ("Given Names / Prenoms", name),
         ("Nationality / Nationalite", "INDIAN" if nationality == "IND" else "UTOPIAN"),
@@ -158,7 +159,8 @@ def generate_tampered_synthetic_passport(
         return generate_synthetic_passport(
             name="JANE",
             surname="DOE",
-            doc_number="X99999999",  # Visual is X99999999, but we pass valid MRZ for A12345678
+            doc_number="A12345678",
+            viz_doc_number="X99999999",
             output_filename="sample_tampered_mismatch.jpg"
         )
     elif tamper_type == "expired":

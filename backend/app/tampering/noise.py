@@ -68,8 +68,8 @@ def detect_noise_discrepancies(
     var_map: np.ndarray,
     global_mean: float,
     global_std: float,
-    threshold_sigma: float = 2.5,
-    min_area: int = 200
+    threshold_sigma: float = 4.5,
+    min_area: int = 1500
 ) -> List[Dict[str, Any]]:
     """
     Flags clusters where local noise variance deviates significantly from the document average.
@@ -132,14 +132,13 @@ def analyze_noise_inconsistency(image: np.ndarray) -> NoiseAnalysisResult:
     norm_var = cv2.normalize(var_map, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
     heatmap_colored = cv2.applyColorMap(norm_var, cv2.COLORMAP_INFERNO)
 
-    # Noise anomaly score
-    # Ratio of std to mean (coefficient of variation) and outlier count
+    # Noise anomaly score: driven by localized statistical outlier clusters
+    cluster_score = min(1.0, len(suspicious_boxes) * 0.40)
     cv_ratio = var_std / max(global_mean, 1e-4)
-    cv_score = min(1.0, max(0.0, (cv_ratio - 0.45) / 1.5))
-    cluster_score = min(1.0, len(suspicious_boxes) * 0.30)
+    cv_score = min(1.0, max(0.0, (cv_ratio - 1.0) / 2.5)) if len(suspicious_boxes) > 0 else 0.0
 
-    anomaly_score = round(min(1.0, (cv_score * 0.6) + (cluster_score * 0.4)), 2)
-    has_anomaly = anomaly_score >= 0.40 or len(suspicious_boxes) > 0
+    anomaly_score = round(min(1.0, (cluster_score * 0.7) + (cv_score * 0.3)), 2)
+    has_anomaly = len(suspicious_boxes) > 0 or anomaly_score >= 0.40
 
     _, buffer = cv2.imencode(".jpg", heatmap_colored)
     b64_heatmap = base64.b64encode(buffer).decode("utf-8")

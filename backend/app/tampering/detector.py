@@ -111,10 +111,8 @@ def analyze_document_tampering(image: np.ndarray) -> ForensicTamperReport:
         (copy_res.clone_anomaly_score * 0.25)
     )
 
-    # If copy-move or high ELA is triggered, boost score
-    if copy_res.is_clone_detected:
-        weighted_score = max(weighted_score, 0.70)
-    if len(ela_res.suspicious_regions) >= 2:
+    # If distinct high-confidence ELA anomalies or multi-vector tampering confirmed
+    if len(ela_res.suspicious_regions) >= 2 or (ela_res.has_anomaly and copy_res.is_clone_detected):
         weighted_score = max(weighted_score, 0.65)
 
     tamper_score = round(min(1.0, weighted_score), 2)
