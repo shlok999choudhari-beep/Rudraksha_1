@@ -158,15 +158,27 @@ export async function runScreeningStaged(
     stages[i] = { ...target, status: 'PROCESSING' };
     onProgress({ stages: [...stages], activeIndex: i });
 
-    // Realistic processing duration for each analytical pipeline engine (~420ms each)
-    await delay(420);
+    // Realistic multi-stage forensic analysis durations totaling 15s
+    const stageDurations: Record<string, number> = {
+      quality: 1200,
+      ocr: 2200,
+      mrz: 1100,
+      validation: 1100,
+      tampering: 2400,
+      face: 2000,
+      liveness: 1500,
+      database: 1300,
+      risk: 1200,
+    };
+    const stageDelay = stageDurations[target.key] ?? 1550;
+    await delay(stageDelay);
 
     stages[i] = target;
     onProgress({ stages: [...stages], activeIndex: i + 1 });
   }
 
   // Brief pause at 100% completion so officer sees all 9 green/completed badges
-  await delay(650);
+  await delay(1000);
 
   onProgress({ stages: [...stages], activeIndex: stages.length, result });
   return result;
